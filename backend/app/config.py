@@ -10,13 +10,20 @@ class Settings(BaseSettings):
 
     # gemini-3.8-flash is on the free tier, which is what makes an 18-call
     # debate free to run.
+    # "live" | "interactions". The free tier gives the regular endpoint only
+    # ~20 requests/day — one debate — so live is the default.
+    agent_backend: str = "live"
+    agent_live_model: str = "gemini-3.8-live"
     agent_model: str = "gemini-3.8-flash"
     # Thinking counts against the output budget, so this needs headroom above
     # the structured output itself (~800 tokens) or the JSON comes back cut off.
     agent_max_tokens: int = 4096
     # minimal | low | medium | high
     agent_thinking_level: str = "low"
-    agent_max_retries: int = 4
+    agent_max_retries: int = 6
+    # Live sessions are the constraint here, not requests per minute.
+    agent_max_concurrency: int = 3
+    agent_timeout_seconds: float = 120.0
 
     # Comma-separated. The deployed frontend origin must be listed here.
     cors_origins: str = "http://localhost:3000"

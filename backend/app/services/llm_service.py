@@ -13,6 +13,37 @@ logger = logging.getLogger(__name__)
 # running, which trips free-tier per-minute limits easily.
 _RETRYABLE_CODES = {429, 500, 502, 503, 504}
 
+
+class IncompleteOutput(Exception):
+    """The model answered but left required fields out.
+
+    Gemini's function calling does not enforce `required` the way a forced
+    Anthropic tool call did, and it drops fields on the larger schemas often
+    enough to kill a debate. Re-asking fixes it; inventing the missing values
+    would not — a fabricated confidence interval is worse than no answer in an
+    app whose whole output is calibrated uncertainty.
+    """
+
+
+def _validate(payload: dict, schema: dict) -> dict:
+    missing = sorted(set(schema.get("required", [])) - set(payload))
+    if missing:
+        raise IncompleteOutput(f"missing required fields: {', '.join(missing)}")
+    return payload
+
+# A debate fans out to six agents per round. Firing all six at a free-tier
+# per-minute limit gets most of them 429'd, and then they all back off in
+# lockstep and collide again — a thundering herd. Gate concurrency instead;
+# retries alone do not fix this.
+_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_semaphore() -> asyncio.Semaphore:
+    global _semaphore
+    if _semaphore is None:
+        _semaphore = asyncio.Semaphore(settings.agent_max_concurrency)
+    return _semaphore
+
 _client = None
 
 
@@ -84,12 +115,15 @@ async def _create_with_retry(client: genai.Client, **kwargs):
     # re-exported anywhere public. Duck-typing survives that being reshuffled.
     for attempt in range(settings.agent_max_retries + 1):
         try:
-            return await client.aio.interactions.create(**kwargs)
+            async with _get_semaphore():
+                return await client.aio.interactions.create(
+                    timeout=settings.agent_timeout_seconds, **kwargs
+                )
         except Exception as exc:
             retryable = getattr(exc, "status_code", None) in _RETRYABLE_CODES
             if not retryable or attempt == settings.agent_max_retries:
                 raise
-            delay = min(2**attempt, 30) + random.uniform(0, 1)
+            delay = min(2**attempt, 30) + random.uniform(0, 3)
             logger.warning(
                 "Gemini %s, retrying in %.1fs (attempt %d/%d)",
                 getattr(exc, "status_code", "?"), delay, attempt + 1, settings.agent_max_retries,
@@ -97,7 +131,83 @@ async def _create_with_retry(client: genai.Client, **kwargs):
             await asyncio.sleep(delay)
 
 
+async def _live_turn(system_prompt: str, user_message: str, schema: dict) -> dict:
+    """Run one agent turn over the Live (websocket) API.
+
+    Why this exists: the free tier allows only ~20 requests/day against the
+    regular model endpoint, which is one debate. The live model is not metered
+    the same way. Two quirks make it work:
+
+      - It rejects response_schema outright ("not supported in generation
+        config"), so structured output goes through a function declaration
+        instead — the same trick the Anthropic version used.
+      - With tools declared it also rejects TEXT output, so we ask for AUDIO
+        and never read it. The answer arrives on the tool-call channel, which
+        is independent of the audio stream.
+    """
+    client = get_client()
+    config = {
+        "response_modalities": ["AUDIO"],
+        "system_instruction": system_prompt,
+        "tools": [
+            {
+                "function_declarations": [
+                    {
+                        "name": "output",
+                        "description": "Report your structured epistemic position",
+                        "parameters": schema,
+                    }
+                ]
+            }
+        ],
+    }
+
+    async with client.aio.live.connect(model=settings.agent_live_model, config=config) as session:
+        await session.send_client_content(
+            turns={"role": "user", "parts": [{"text": user_message}]},
+            turn_complete=True,
+        )
+        async for msg in session.receive():
+            tool_call = getattr(msg, "tool_call", None)
+            if tool_call:
+                for fc in tool_call.function_calls:
+                    if fc.name == "output":
+                        return _validate(dict(fc.args), schema)
+            server_content = getattr(msg, "server_content", None)
+            if server_content and getattr(server_content, "turn_complete", False):
+                break
+
+    raise ValueError("Live session ended without calling output")
+
+
+async def _live_turn_with_retry(system_prompt: str, user_message: str, schema: dict) -> dict:
+    for attempt in range(settings.agent_max_retries + 1):
+        try:
+            async with _get_semaphore():
+                return await asyncio.wait_for(
+                    _live_turn(system_prompt, user_message, schema),
+                    timeout=settings.agent_timeout_seconds,
+                )
+        except Exception as exc:
+            status = getattr(exc, "status_code", None)
+            retryable = (
+                status in _RETRYABLE_CODES
+                or isinstance(exc, (asyncio.TimeoutError, IncompleteOutput))
+            )
+            if not retryable or attempt == settings.agent_max_retries:
+                raise
+            delay = min(2**attempt, 30) + random.uniform(0, 3)
+            logger.warning(
+                "Live turn failed (%s: %s), retrying in %.1fs (attempt %d/%d)",
+                type(exc).__name__, exc, delay, attempt + 1, settings.agent_max_retries,
+            )
+            await asyncio.sleep(delay)
+
+
 async def run_agent_turn(system_prompt: str, user_message: str, schema: dict) -> dict:
+    if settings.agent_backend == "live":
+        return await _live_turn_with_retry(system_prompt, user_message, schema)
+
     client = get_client()
     interaction = await _create_with_retry(
         client,
@@ -124,6 +234,6 @@ async def run_agent_turn(system_prompt: str, user_message: str, schema: dict) ->
             f"raise AGENT_MAX_TOKENS or lower AGENT_THINKING_LEVEL"
         )
     try:
-        return json.loads(raw)
+        return _validate(json.loads(raw), schema)
     except json.JSONDecodeError as exc:
         raise ValueError(f"Gemini returned malformed JSON: {raw[:200]}") from exc
