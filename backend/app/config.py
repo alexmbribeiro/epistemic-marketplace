@@ -26,7 +26,9 @@ class Settings(BaseSettings):
     agent_timeout_seconds: float = 120.0
 
     # Comma-separated. The deployed frontend origin must be listed here.
-    cors_origins: str = "http://localhost:3000"
+    # Both loopback spellings: they are distinct origins to the browser, and
+    # opening the app on 127.0.0.1 otherwise loads fine but fetches nothing.
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     @property
     def cors_origin_list(self) -> list[str]:
