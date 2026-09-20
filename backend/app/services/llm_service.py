@@ -14,6 +14,26 @@ logger = logging.getLogger(__name__)
 _RETRYABLE_CODES = {429, 500, 502, 503, 504}
 
 
+def is_retryable(exc: Exception) -> bool:
+    """Whether a failed call is worth repeating.
+
+    Two shapes, because the Live API has two ways of saying the same thing.
+    Over HTTP a rate limit is a 429 with a status_code. Over the websocket it
+    arrives as a close frame — code 1011, "You exceeded your current quota" —
+    which carries no status_code at all. Matching only on the attribute let
+    every quota error through unretried, and a whole jury died in silence.
+    """
+    if getattr(exc, "status_code", None) in _RETRYABLE_CODES:
+        return True
+    if isinstance(exc, (asyncio.TimeoutError, IncompleteOutput, NoToolCall)):
+        return True
+    text = str(exc).lower()
+    return any(
+        marker in text
+        for marker in ("quota", "rate limit", "resource_exhausted", "1011 (internal error)")
+    )
+
+
 class NoToolCall(Exception):
     """The live session ended without the model calling `output`.
 
@@ -183,8 +203,7 @@ async def _create_with_retry(client: genai.Client, **kwargs):
                     timeout=settings.agent_timeout_seconds, **kwargs
                 )
         except Exception as exc:
-            retryable = getattr(exc, "status_code", None) in _RETRYABLE_CODES
-            if not retryable or attempt == settings.agent_max_retries:
+            if not is_retryable(exc) or attempt == settings.agent_max_retries:
                 raise
             delay = min(2**attempt, 30) + random.uniform(0, 3)
             logger.warning(
@@ -307,12 +326,7 @@ async def _live_turn_with_retry(system_prompt: str, user_message: str, schema: d
                     timeout=settings.agent_timeout_seconds,
                 )
         except Exception as exc:
-            status = getattr(exc, "status_code", None)
-            retryable = (
-                status in _RETRYABLE_CODES
-                or isinstance(exc, (asyncio.TimeoutError, IncompleteOutput, NoToolCall))
-            )
-            if not retryable or attempt == settings.agent_max_retries:
+            if not is_retryable(exc) or attempt == settings.agent_max_retries:
                 raise
             delay = min(2**attempt, 30) + random.uniform(0, 3)
             logger.warning(

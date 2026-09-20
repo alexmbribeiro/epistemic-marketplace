@@ -6,14 +6,15 @@ from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents import DEFAULT_ARCHETYPES, JURY_SIZE, build_agent
 from app.core.jury import compute_elo_updates, select_jury
 from app.api.deps import get_current_user
 from app.config import settings
-from app.core.debate_engine import run_debate
+from app.agents.base_agent import AgentResult
+from app.core.debate_engine import run_debate, run_jury
 from app.database import AsyncSessionLocal, get_db
 from app.models.agent import CognitiveAgent
 from app.models.claim import Claim
@@ -224,6 +225,59 @@ async def _record_jury(db, debate_id: str, result: dict, agent_records: list, ju
         judge = live.get(rec.id)
         if judge:
             judge.debates_judged = (judge.debates_judged or 0) + 1
+
+
+@router.post("/{debate_id}/rejudge")
+async def rejudge(debate_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Re-run the jury on a debate that already happened.
+
+    A jury can die without taking the debate with it — the rounds are already
+    persisted, so there is no reason to spend another twenty-one calls
+    re-arguing a claim just because three judges hit a quota wall. This
+    repairs the rating and the Elo from the stored transcript.
+    """
+    debate = (await db.execute(select(Debate).where(Debate.id == debate_id))).scalar_one_or_none()
+    if not debate:
+        raise HTTPException(status_code=404, detail="Debate not found")
+    stored = (debate.synthesis or {}).get("positions")
+    if not stored:
+        raise HTTPException(status_code=400, detail="This debate stored no positions to judge")
+
+    existing = (
+        await db.execute(select(func.count(JuryRating.id)).where(JuryRating.debate_id == debate_id))
+    ).scalar_one()
+    if existing:
+        raise HTTPException(
+            status_code=409, detail=f"Already judged ({existing} ratings). Delete them first to redo."
+        )
+
+    rounds = [[AgentResult(**p) for p in stored[f"round{i}"]] for i in (1, 2, 3)]
+    participant_ids = [uuid.UUID(p.agent_id) for p in rounds[0]]
+
+    agent_records = list(
+        (await db.execute(select(CognitiveAgent).where(CognitiveAgent.id.in_(participant_ids)))).scalars().all()
+    )
+    all_agents = (
+        await db.execute(select(CognitiveAgent).where(CognitiveAgent.creator_id == None))
+    ).scalars().all()
+    jury_records = select_jury(list(all_agents), participant_ids, JURY_SIZE)
+    jury = [
+        build_agent(r.archetype, str(r.id), r.config, r.system_prompt, r.name) for r in jury_records
+    ]
+
+    claim = (await db.execute(select(Claim).where(Claim.id == debate.claim_id))).scalar_one()
+    verdict = await run_jury(claim.content, rounds, jury)
+
+    # JSONB does not notice in-place mutation; reassign so it is written.
+    debate.synthesis = {**debate.synthesis, "jury": verdict}
+    await _record_jury(db, str(debate_id), {"synthesis": debate.synthesis}, agent_records, jury_records)
+    await db.commit()
+
+    return {
+        "debate_id": str(debate_id),
+        "judges": [j["name"] for j in verdict.get("judges", [])],
+        "ratings": len(verdict.get("rows", [])),
+    }
 
 
 @router.get("/", response_model=list[DebateResponse])
