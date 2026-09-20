@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { calibrationApi } from "@/lib/api";
-import { paletteFor } from "@/lib/agentColors";
 
 const CRITERIA = [
   ["method_fidelity", "Method"],
@@ -20,8 +19,6 @@ export default function CalibrationPage() {
     queryKey: ["judge-bias"],
     queryFn: () => calibrationApi.judgeBias(),
   });
-
-  const palette = paletteFor((board ?? []).map((a) => a.archetype));
 
   // How severe each judge is overall. Within one debate this mostly cancels —
   // every participant faced the same panel — but it is worth seeing.
@@ -69,10 +66,6 @@ export default function CalibrationPage() {
                 <td className="px-4 py-3 text-white/28 font-mono">{i + 1}</td>
                 <td className="px-4 py-3">
                   <span className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: palette[a.archetype] }}
-                    />
                     <span className="font-medium text-white/85">{a.name}</span>
                     {a.provisional && (
                       <span

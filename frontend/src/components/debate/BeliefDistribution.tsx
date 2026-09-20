@@ -24,19 +24,19 @@ export default function BeliefDistributionChart({ distribution }: Props) {
     color: BUCKET_COLORS[i],
   }));
 
-  const meanPct = Math.round(distribution.weighted_mean * 100);
+  const meanPct = Math.round(distribution.mean * 100);
   const meanLabel =
-    distribution.weighted_mean > 0.65
+    distribution.mean > 0.65
       ? "Likely True"
-      : distribution.weighted_mean < 0.35
+      : distribution.mean < 0.35
       ? "Likely False"
       : "Uncertain";
   // Same diverging logic as the bars: the headline must not say "cyan = true"
   // while the chart says something else.
   const meanColor =
-    distribution.weighted_mean > 0.65
+    distribution.mean > 0.65
       ? "text-[#6ea8ea]"
-      : distribution.weighted_mean < 0.35
+      : distribution.mean < 0.35
       ? "text-[#e88b8b]"
       : "text-white/70";
 

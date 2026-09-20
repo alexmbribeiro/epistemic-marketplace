@@ -119,7 +119,6 @@ async def run_debate(
     debate_id: str,
     claim_content: str,
     agents: list[BaseAgent],
-    reputation_map: dict[str, float],
     jury: list[BaseAgent] | None = None,
     on_update=None,
 ) -> dict:
@@ -157,7 +156,7 @@ async def run_debate(
     await emit("round3_complete", {"positions": [_result_to_dict(r) for r in round3]})
 
     # Aggregate final distribution
-    distribution = compute_belief_distribution(round3, reputation_map)
+    distribution = compute_belief_distribution(round3)
 
     # Build argument graph
     graph = build_argument_graph([list(round1), list(round2), list(round3)])

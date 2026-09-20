@@ -19,11 +19,9 @@ class CognitiveAgent(Base):
     config: Mapped[dict] = mapped_column(JSONB, default=dict)
     creator_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)
-    reputation_score: Mapped[float] = mapped_column(Float, default=1.0)
-    # Peer rating from debates. Kept separate from reputation_score on
-    # purpose: reputation weights the belief aggregation, and weighting the
-    # map of uncertainty by how well other schools like you would be a
-    # different claim than this number supports.
+    # Peer rating from debates. Deliberately does not feed the belief
+    # aggregation: weighting the map of uncertainty by how well rival schools
+    # rate you would be a different claim than this number supports.
     elo_rating: Mapped[float] = mapped_column(Float, default=1500.0)
     debates_judged: Mapped[int] = mapped_column(Integer, default=0)
     debates_rated_in: Mapped[int] = mapped_column(Integer, default=0)

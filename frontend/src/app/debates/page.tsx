@@ -59,7 +59,7 @@ export default function DebatesPage() {
 
 function DebateRow({ debate }: { debate: Debate }) {
   const dist = debate.final_belief_distribution;
-  const meanPct = dist ? Math.round(dist.weighted_mean * 100) : null;
+  const meanPct = dist ? Math.round(dist.mean * 100) : null;
 
   return (
     <Link href={`/debates/${debate.id}`}>

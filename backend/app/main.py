@@ -34,7 +34,6 @@ async def seed_system_agents():
                     config={},
                     creator_id=None,
                     is_public=True,
-                    reputation_score=1.0,
                 ))
         await db.commit()
 

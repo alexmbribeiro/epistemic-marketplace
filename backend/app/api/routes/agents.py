@@ -1,12 +1,13 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_user
 from app.database import get_db
 from app.models.agent import CognitiveAgent
+from app.models.debate import AgentPosition, JuryRating
 from app.models.user import User
 from app.schemas.agent import AgentCreate, AgentResponse
 
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 @router.get("/", response_model=list[AgentResponse])
 async def list_agents(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(CognitiveAgent).where(CognitiveAgent.is_public == True).order_by(CognitiveAgent.reputation_score.desc())
+        select(CognitiveAgent).where(CognitiveAgent.is_public == True).order_by(CognitiveAgent.elo_rating.desc())
     )
     return result.scalars().all()
 
@@ -49,3 +50,142 @@ async def create_agent(
     await db.commit()
     await db.refresh(agent)
     return agent
+
+
+def _pair(rows, label_a, label_b, n=2):
+    ranked = sorted(rows, key=lambda r: r["value"])
+    return {label_a: ranked[-n:][::-1], label_b: ranked[:n]}
+
+
+@router.get("/{agent_id}/stats")
+async def agent_stats(agent_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Who this agent lines up with, who scores it well, and how it behaves.
+
+    All of it is derived from what debates already record — no extra model
+    calls. Everything is thin at low debate counts, so each block reports the
+    sample it rests on rather than presenting a single number as settled.
+    """
+    agent = (await db.execute(select(CognitiveAgent).where(CognitiveAgent.id == agent_id))).scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    names = {a.id: a.name for a in (await db.execute(select(CognitiveAgent))).scalars().all()}
+
+    # Final-round belief per agent per debate.
+    finals = (
+        await db.execute(
+            select(AgentPosition.debate_id, AgentPosition.agent_id, AgentPosition.belief_score)
+            .where(AgentPosition.round_number == 3)
+        )
+    ).all()
+
+    by_debate: dict = {}
+    for debate_id, aid, score in finals:
+        by_debate.setdefault(debate_id, {})[aid] = score
+
+    # Agreement: mean gap in final belief across debates actually shared.
+    gaps: dict = {}
+    own_scores, distances = [], []
+    for debate_id, scores in by_debate.items():
+        if agent_id not in scores:
+            continue
+        mine = scores[agent_id]
+        own_scores.append(mine)
+        others = [v for k, v in scores.items() if k != agent_id]
+        if others:
+            distances.append(abs(mine - sum(others) / len(others)))
+        for other_id, theirs in scores.items():
+            if other_id == agent_id:
+                continue
+            gaps.setdefault(other_id, []).append(abs(mine - theirs))
+
+    agreement = [
+        {"name": names.get(k, "?"), "value": round(sum(v) / len(v), 3), "n": len(v)}
+        for k, v in gaps.items()
+    ]
+    # Lower gap = closer, so the labels invert the sort.
+    closest = sorted(agreement, key=lambda r: r["value"])[:2]
+    furthest = sorted(agreement, key=lambda r: -r["value"])[:2]
+
+    # As judge, and as subject.
+    given = (
+        await db.execute(
+            select(JuryRating.subject_agent_id, func.avg(JuryRating.overall), func.count(JuryRating.id))
+            .where(JuryRating.judge_agent_id == agent_id)
+            .group_by(JuryRating.subject_agent_id)
+        )
+    ).all()
+    received = (
+        await db.execute(
+            select(JuryRating.judge_agent_id, func.avg(JuryRating.overall), func.count(JuryRating.id))
+            .where(JuryRating.subject_agent_id == agent_id)
+            .group_by(JuryRating.judge_agent_id)
+        )
+    ).all()
+    fmt = lambda rows: [
+        {"name": names.get(r[0], "?"), "value": round(float(r[1]), 1), "n": r[2]} for r in rows
+    ]
+
+    own_criteria = (
+        await db.execute(
+            select(
+                func.avg(JuryRating.method_fidelity),
+                func.avg(JuryRating.engagement),
+                func.avg(JuryRating.crux_quality),
+                func.avg(JuryRating.responsiveness),
+                func.count(JuryRating.id),
+            ).where(JuryRating.subject_agent_id == agent_id)
+        )
+    ).first()
+
+    # Swing: total distance travelled across rounds, averaged over debates.
+    all_positions = (
+        await db.execute(
+            select(AgentPosition.debate_id, AgentPosition.round_number, AgentPosition.belief_score)
+            .where(AgentPosition.agent_id == agent_id)
+            .order_by(AgentPosition.debate_id, AgentPosition.round_number)
+        )
+    ).all()
+    per_debate: dict = {}
+    for debate_id, rnd, score in all_positions:
+        per_debate.setdefault(debate_id, []).append(score)
+    swings = [
+        sum(abs(v[i + 1] - v[i]) for i in range(len(v) - 1)) for v in per_debate.values() if len(v) > 1
+    ]
+
+    return {
+        "agent_id": str(agent.id),
+        "name": agent.name,
+        "archetype": agent.archetype,
+        "description": agent.description,
+        "elo_rating": round(agent.elo_rating, 1),
+        "debates": agent.debates_rated_in,
+        "judged": agent.debates_judged,
+        "provisional": (agent.debates_rated_in or 0) < 5,
+        "criteria": (
+            {
+                "method_fidelity": round(float(own_criteria[0]), 1),
+                "engagement": round(float(own_criteria[1]), 1),
+                "crux_quality": round(float(own_criteria[2]), 1),
+                "responsiveness": round(float(own_criteria[3]), 1),
+                "n": own_criteria[4],
+            }
+            if own_criteria and own_criteria[4]
+            else None
+        ),
+        "agrees_most_with": closest,
+        "disagrees_most_with": furthest,
+        "rates_highest": sorted(fmt(given), key=lambda r: -r["value"])[:2],
+        "rates_lowest": sorted(fmt(given), key=lambda r: r["value"])[:2],
+        "rated_best_by": sorted(fmt(received), key=lambda r: -r["value"])[:2],
+        "rated_worst_by": sorted(fmt(received), key=lambda r: r["value"])[:2],
+        "disposition": {
+            # Above 0.5 this agent tends to affirm; below, to doubt.
+            "mean_belief": round(sum(own_scores) / len(own_scores), 3) if own_scores else None,
+            # How far it habitually sits from the rest of the room.
+            "mean_distance_from_room": round(sum(distances) / len(distances), 3) if distances else None,
+            # How much ground it covers across three rounds.
+            "mean_swing": round(sum(swings) / len(swings), 3) if swings else None,
+            "n": len(own_scores),
+        },
+    }

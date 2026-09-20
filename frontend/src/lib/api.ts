@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Claim, CognitiveAgent, Debate, JudgeBiasRow, LeaderboardEntry } from "@/types";
+import type { AgentStats, Claim, CognitiveAgent, Debate, JudgeBiasRow, LeaderboardEntry } from "@/types";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
@@ -32,6 +32,7 @@ export const debatesApi = {
 export const agentsApi = {
   list: () => api.get<CognitiveAgent[]>("/agents/").then((r) => r.data),
   get: (id: string) => api.get<CognitiveAgent>(`/agents/${id}`).then((r) => r.data),
+  stats: (id: string) => api.get<AgentStats>(`/agents/${id}/stats`).then((r) => r.data),
   create: (body: {
     name: string;
     archetype: string;

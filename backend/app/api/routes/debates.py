@@ -114,7 +114,6 @@ async def _run_debate_background(
                 build_agent(rec.archetype, str(rec.id), rec.config, rec.system_prompt, rec.name)
                 for rec in agent_records
             ]
-            reputation_map = {str(rec.id): rec.reputation_score for rec in agent_records}
             jury = [
                 build_agent(rec.archetype, str(rec.id), rec.config, rec.system_prompt, rec.name)
                 for rec in (jury_records or [])
@@ -126,7 +125,7 @@ async def _run_debate_background(
             debate.status = "round1"
             await db.commit()
 
-            result = await run_debate(debate_id, claim_content, agents, reputation_map, jury=jury)
+            result = await run_debate(debate_id, claim_content, agents, jury=jury)
 
             # Persist results
             debate_result_db = await db.execute(select(Debate).where(Debate.id == uuid.UUID(debate_id)))

@@ -5,7 +5,7 @@ import { asText } from "@/lib/text";
 
 interface Props {
   conclusion: Conclusion;
-  weightedMean: number;
+  mean: number;
 }
 
 const CONSENSUS = {
@@ -15,7 +15,7 @@ const CONSENSUS = {
   deadlocked: { label: "Deadlocked", ring: "border-rose-400/25", dot: "bg-rose-300", text: "text-rose-200/80" },
 } as const;
 
-export default function ConclusionPanel({ conclusion, weightedMean }: Props) {
+export default function ConclusionPanel({ conclusion, mean }: Props) {
   const c = CONSENSUS[conclusion.consensus] ?? CONSENSUS.contested;
 
   return (
@@ -25,7 +25,7 @@ export default function ConclusionPanel({ conclusion, weightedMean }: Props) {
         <h2 className="eyebrow">Conclusion</h2>
         <span className={`text-xs ${c.text}`}>{c.label}</span>
         <span className="ml-auto font-mono text-sm text-white/55">
-          {Math.round(weightedMean * 100)}% weighted belief
+          {Math.round(mean * 100)}% mean belief
         </span>
       </div>
 

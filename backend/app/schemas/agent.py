@@ -20,7 +20,9 @@ class AgentResponse(BaseModel):
     description: str
     config: dict
     is_public: bool
-    reputation_score: float
+    elo_rating: float
+    debates_rated_in: int
+    debates_judged: int
     creator_id: uuid.UUID | None
     created_at: datetime
 

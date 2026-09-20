@@ -39,7 +39,9 @@ export interface CognitiveAgent {
   description: string;
   config: Record<string, unknown>;
   is_public: boolean;
-  reputation_score: number;
+  elo_rating: number;
+  debates_rated_in: number;
+  debates_judged: number;
   creator_id: string | null;
   created_at: string;
 }
@@ -71,7 +73,6 @@ export interface Challenge {
 
 export interface BeliefDistribution {
   mean: number;
-  weighted_mean: number;
   std: number;
   buckets: BeliefBucket[];
   dominant_agents: DominantAgent[];
@@ -220,4 +221,42 @@ export interface JudgeBiasRow {
   subject: string;
   mean_score: number;
   n: number;
+}
+
+
+/** One side of a comparison: another agent, a number, and the sample it rests on. */
+export interface StatRow {
+  name: string;
+  value: number;
+  n: number;
+}
+
+export interface AgentStats {
+  agent_id: string;
+  name: string;
+  archetype: ArchetypeId;
+  description: string;
+  elo_rating: number;
+  debates: number;
+  judged: number;
+  provisional: boolean;
+  criteria: {
+    method_fidelity: number;
+    engagement: number;
+    crux_quality: number;
+    responsiveness: number;
+    n: number;
+  } | null;
+  agrees_most_with: StatRow[];
+  disagrees_most_with: StatRow[];
+  rates_highest: StatRow[];
+  rates_lowest: StatRow[];
+  rated_best_by: StatRow[];
+  rated_worst_by: StatRow[];
+  disposition: {
+    mean_belief: number | null;
+    mean_distance_from_room: number | null;
+    mean_swing: number | null;
+    n: number;
+  };
 }

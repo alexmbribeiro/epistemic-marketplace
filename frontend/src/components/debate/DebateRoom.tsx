@@ -87,7 +87,7 @@ export default function DebateRoom({ debateId }: Props) {
       {effectiveSynthesis?.conclusion && effectiveDistribution && (
         <ConclusionPanel
           conclusion={effectiveSynthesis.conclusion}
-          weightedMean={effectiveDistribution.weighted_mean}
+          mean={effectiveDistribution.mean}
         />
       )}
 

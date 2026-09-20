@@ -4,8 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { claimsApi, debatesApi } from "@/lib/api";
 import AgentPicker from "@/components/debate/AgentPicker";
-import { useQuery } from "@tanstack/react-query";
-import { agentsApi } from "@/lib/api";
 
 const CATEGORIES = ["science", "philosophy", "economics", "ethics", "politics", "other"];
 
@@ -17,10 +15,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [agentIds, setAgentIds] = useState<string[]>([]);
-  // Sourced from the API so it cannot go stale when the roster changes —
-  // this grid used to hard-code six archetypes that no longer exist.
-  const { data: agents } = useQuery({ queryKey: ["agents"], queryFn: agentsApi.list });
-  const featured = (agents ?? []).slice(0, 6);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,18 +49,6 @@ export default function HomePage() {
         </p>
       </div>
 
-      {featured.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {featured.map((a) => (
-            <div key={a.id} className="glass-sm glass-interactive p-4 space-y-1.5">
-              <div className="text-[14px] font-medium text-white/85">{a.name}</div>
-              <div className="text-[12px] leading-snug text-white/35 line-clamp-2">
-                {a.description}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-4 glass p-6">
         <h2 className="display text-[17px] text-white/85">Submit a claim for debate</h2>
