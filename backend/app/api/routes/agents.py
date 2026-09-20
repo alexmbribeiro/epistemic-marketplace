@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, require_user
 from app.database import get_db
 from app.models.agent import CognitiveAgent
-from app.models.debate import AgentPosition, JuryRating
+from app.models.claim import Claim
+from app.models.debate import AgentPosition, Debate, JuryRating
 from app.models.user import User
 from app.schemas.agent import AgentCreate, AgentResponse
 
@@ -153,6 +154,65 @@ async def agent_stats(agent_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         sum(abs(v[i + 1] - v[i]) for i in range(len(v) - 1)) for v in per_debate.values() if len(v) > 1
     ]
 
+    # --- Reciprocity -------------------------------------------------------
+    # Whether A scores B the way B scores A. The asymmetry is the interesting
+    # part and an average hides it by construction: two agents can both sit at
+    # the mean while one consistently marks the other down.
+    given_map = {r[0]: float(r[1]) for r in given}
+    received_map = {r[0]: float(r[1]) for r in received}
+    reciprocity = [
+        {
+            "name": names.get(other, "?"),
+            "i_give": round(given_map[other], 1),
+            "they_give": round(received_map[other], 1),
+            "gap": round(given_map[other] - received_map[other], 1),
+        }
+        for other in set(given_map) & set(received_map)
+    ]
+    reciprocity.sort(key=lambda r: -abs(r["gap"]))
+
+    # --- Craft by claim category -------------------------------------------
+    # A Humean should do well on empirical claims and badly on metaphysical
+    # ones. Whether that actually shows up is a test of the prompts.
+    cats = (
+        await db.execute(
+            select(Claim.category, func.avg(JuryRating.overall), func.count(JuryRating.id))
+            .join(Debate, Debate.claim_id == Claim.id)
+            .join(JuryRating, JuryRating.debate_id == Debate.id)
+            .where(JuryRating.subject_agent_id == agent_id)
+            .group_by(Claim.category)
+        )
+    ).all()
+    by_category = sorted(
+        [{"name": c[0], "value": round(float(c[1]), 1), "n": c[2]} for c in cats],
+        key=lambda r: -r["value"],
+    )
+
+    # --- Where the movement happens ----------------------------------------
+    # Leg one is the response to seeing the room; leg two is the response to
+    # being cross-examined. An agent that only moves on leg one drifts with
+    # the company; one that moves on leg two is answering an argument.
+    leg1 = [abs(v[1] - v[0]) for v in per_debate.values() if len(v) > 2]
+    leg2 = [abs(v[2] - v[1]) for v in per_debate.values() if len(v) > 2]
+
+    # --- Crux influence ----------------------------------------------------
+    # NOT citation: nothing records whether anyone was actually moved by a
+    # crux. This is how often this agent's cruxes were the best-rated in the
+    # debate — peer judgement of the crux, not evidence it persuaded.
+    per_debate_crux = (
+        await db.execute(
+            select(JuryRating.debate_id, JuryRating.subject_agent_id, func.avg(JuryRating.crux_quality))
+            .group_by(JuryRating.debate_id, JuryRating.subject_agent_id)
+        )
+    ).all()
+    best_by_debate: dict = {}
+    for debate_id, subject, avg_crux in per_debate_crux:
+        cur = best_by_debate.get(debate_id)
+        if cur is None or float(avg_crux) > cur[1]:
+            best_by_debate[debate_id] = (subject, float(avg_crux))
+    my_debates = {d for d, subj, _ in per_debate_crux if subj == agent_id}
+    top_crux = sum(1 for d in my_debates if best_by_debate.get(d, (None,))[0] == agent_id)
+
     return {
         "agent_id": str(agent.id),
         "name": agent.name,
@@ -179,6 +239,18 @@ async def agent_stats(agent_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         "rates_lowest": sorted(fmt(given), key=lambda r: r["value"])[:2],
         "rated_best_by": sorted(fmt(received), key=lambda r: -r["value"])[:2],
         "rated_worst_by": sorted(fmt(received), key=lambda r: r["value"])[:2],
+        "reciprocity": reciprocity[:3],
+        "by_category": by_category,
+        "movement": {
+            # Mean absolute change on each leg, in belief points.
+            "on_seeing_others": round(sum(leg1) / len(leg1), 3) if leg1 else None,
+            "on_being_challenged": round(sum(leg2) / len(leg2), 3) if leg2 else None,
+            "n": len(leg1),
+        },
+        "crux_influence": {
+            "top_in_debates": top_crux,
+            "of_debates": len(my_debates),
+        },
         "disposition": {
             # Above 0.5 this agent tends to affirm; below, to doubt.
             "mean_belief": round(sum(own_scores) / len(own_scores), 3) if own_scores else None,

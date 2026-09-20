@@ -253,10 +253,30 @@ export interface AgentStats {
   rates_lowest: StatRow[];
   rated_best_by: StatRow[];
   rated_worst_by: StatRow[];
+  reciprocity: { name: string; i_give: number; they_give: number; gap: number }[];
+  by_category: StatRow[];
+  movement: {
+    on_seeing_others: number | null;
+    on_being_challenged: number | null;
+    n: number;
+  };
+  crux_influence: { top_in_debates: number; of_debates: number };
   disposition: {
     mean_belief: number | null;
     mean_distance_from_room: number | null;
     mean_swing: number | null;
     n: number;
   };
+}
+
+export interface FaultLine {
+  a: string;
+  b: string;
+  mean_gap: number;
+  n: number;
+}
+
+export interface FaultLines {
+  furthest_apart: FaultLine[];
+  closest: FaultLine[];
 }

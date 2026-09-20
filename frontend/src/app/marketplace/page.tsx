@@ -102,6 +102,65 @@ function Detail({ agentId }: { agentId: string }) {
             </div>
           )}
 
+          {s.reciprocity.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[11px] text-white/30">
+                Reciprocity — what it gives, against what it gets back
+              </p>
+              {s.reciprocity.map((r) => (
+                <div key={r.name} className="flex items-baseline gap-2 text-[13px]">
+                  <span className="text-white/70 w-28 shrink-0">{r.name}</span>
+                  <span className="tabular-nums text-white/50">
+                    gives {r.i_give} · gets {r.they_give}
+                  </span>
+                  <span className="flex-1" />
+                  <span
+                    className={`tabular-nums text-[12px] ${
+                      Math.abs(r.gap) >= 10 ? "text-amber-200/70" : "text-white/25"
+                    }`}
+                  >
+                    {r.gap > 0 ? "+" : ""}
+                    {r.gap}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {s.by_category.length > 0 && (
+            <Rows label="Craft by claim category" rows={s.by_category} />
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {s.movement.on_seeing_others !== null && (
+              <div className="glass-sm p-4 space-y-1">
+                <p className="text-[11px] text-white/30">Where it moves</p>
+                <p className="text-[13px] text-white/60 leading-relaxed">
+                  {Math.round(s.movement.on_seeing_others * 100)}pts on seeing the room,{" "}
+                  {Math.round((s.movement.on_being_challenged ?? 0) * 100)}pts after being
+                  challenged.{" "}
+                  <span className="text-white/35">
+                    {(s.movement.on_being_challenged ?? 0) > s.movement.on_seeing_others
+                      ? "Moves more when answered than when it merely looks around."
+                      : "Moves more on first contact than under cross-examination."}
+                  </span>
+                </p>
+              </div>
+            )}
+            {s.crux_influence.of_debates > 0 && (
+              <div className="glass-sm p-4 space-y-1">
+                <p className="text-[11px] text-white/30">Crux standing</p>
+                <p className="text-[13px] text-white/60 leading-relaxed">
+                  Best-rated crux in {s.crux_influence.top_in_debates} of{" "}
+                  {s.crux_influence.of_debates} debates.{" "}
+                  <span className="text-white/35">
+                    Peer judgement of the crux, not evidence anyone was moved by it.
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-wrap gap-x-8 gap-y-2 text-[12px] text-white/35">
             {d.mean_distance_from_room !== null && (
               <span>

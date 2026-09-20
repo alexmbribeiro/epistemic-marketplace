@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.agent import CognitiveAgent
-from app.models.debate import JuryRating
+from app.models.debate import AgentPosition, JuryRating
 
 router = APIRouter(prefix="/calibration", tags=["calibration"])
 
@@ -87,3 +87,43 @@ async def judge_bias(db: AsyncSession = Depends(get_db)):
         }
         for r in rows
     ]
+
+
+@router.get("/fault-lines")
+async def fault_lines(db: AsyncSession = Depends(get_db)):
+    """The pairs that end up furthest apart, across every debate they shared.
+
+    Not a per-agent statistic: this is where the roster actually splits. A
+    pair that has only met once is noise, so each row carries its count and
+    the caller decides what to trust.
+    """
+    finals = (
+        await db.execute(
+            select(AgentPosition.debate_id, AgentPosition.agent_id, AgentPosition.belief_score)
+            .where(AgentPosition.round_number == 3)
+        )
+    ).all()
+    names = {a.id: a.name for a in (await db.execute(select(CognitiveAgent))).scalars().all()}
+
+    by_debate: dict = {}
+    for debate_id, agent_id, score in finals:
+        by_debate.setdefault(debate_id, {})[agent_id] = score
+
+    gaps: dict = {}
+    for scores in by_debate.values():
+        ids = sorted(scores, key=str)
+        for i, a in enumerate(ids):
+            for b in ids[i + 1:]:
+                gaps.setdefault((a, b), []).append(abs(scores[a] - scores[b]))
+
+    rows = [
+        {
+            "a": names.get(a, "?"),
+            "b": names.get(b, "?"),
+            "mean_gap": round(sum(v) / len(v), 3),
+            "n": len(v),
+        }
+        for (a, b), v in gaps.items()
+    ]
+    rows.sort(key=lambda r: -r["mean_gap"])
+    return {"furthest_apart": rows[:5], "closest": sorted(rows, key=lambda r: r["mean_gap"])[:5]}
