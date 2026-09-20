@@ -42,3 +42,6 @@ Thumbs.db
 
 # ── coverage ─────────────────────────────────────────────────────────────────
 coverage/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
