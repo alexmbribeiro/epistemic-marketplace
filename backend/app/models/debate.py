@@ -24,6 +24,16 @@ class Debate(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     claim = relationship("Claim", back_populates="debates")
+
+    @property
+    def claim_content(self) -> str | None:
+        """Requires the claim to have been eager-loaded; a lazy load would
+        raise inside an async session."""
+        return self.claim.content if self.claim else None
+
+    @property
+    def claim_category(self) -> str | None:
+        return self.claim.category if self.claim else None
     positions = relationship("AgentPosition", back_populates="debate")
     arguments = relationship("Argument", back_populates="debate")
 

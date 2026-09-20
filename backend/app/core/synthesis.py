@@ -8,6 +8,7 @@ the agents ended up closer together or further apart.
 import statistics
 
 from app.agents.base_agent import AgentResult
+from app.core.argument_graph import resolve_agent
 
 
 def build_trajectory(all_rounds: list[list[AgentResult]]) -> dict:
@@ -70,11 +71,16 @@ def build_trajectory(all_rounds: list[list[AgentResult]]) -> dict:
 
 def extract_exchanges(all_rounds: list[list[AgentResult]]) -> list[dict]:
     """Who challenged whom, in order. This is the back-and-forth itself."""
+    everyone = {p.agent_id: p for r in all_rounds for p in r}.values()
     exchanges = []
     for positions in all_rounds:
         for pos in positions:
             for ch in pos.challenges or []:
-                target = (ch.get("target_agent") or "").strip()
+                raw = (ch.get("target_agent") or "").strip()
+                # The model writes "Wittgensteinian" as often as "Wittgenstein";
+                # resolve to the agent so the thread reads consistently.
+                matched = resolve_agent(raw, everyone)
+                target = matched.agent_name if matched else raw
                 text = (ch.get("challenge") or "").strip()
                 if not text:
                     continue

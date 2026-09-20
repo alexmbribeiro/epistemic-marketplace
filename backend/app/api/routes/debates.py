@@ -8,6 +8,7 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.agents import DEFAULT_ARCHETYPES, JURY_SIZE, build_agent
 from app.core.jury import compute_elo_updates, select_jury
@@ -282,13 +283,21 @@ async def rejudge(debate_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 
 @router.get("/", response_model=list[DebateResponse])
 async def list_debates(db: AsyncSession = Depends(get_db), limit: int = 20, offset: int = 0):
-    result = await db.execute(select(Debate).order_by(Debate.created_at.desc()).limit(limit).offset(offset))
+    result = await db.execute(
+        select(Debate)
+        .options(selectinload(Debate.claim))
+        .order_by(Debate.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
     return result.scalars().all()
 
 
 @router.get("/{debate_id}", response_model=DebateResponse)
 async def get_debate(debate_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Debate).where(Debate.id == debate_id))
+    result = await db.execute(
+        select(Debate).options(selectinload(Debate.claim)).where(Debate.id == debate_id)
+    )
     debate = result.scalar_one_or_none()
     if not debate:
         raise HTTPException(status_code=404, detail="Debate not found")

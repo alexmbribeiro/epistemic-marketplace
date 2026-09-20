@@ -1,6 +1,39 @@
+import re
 import uuid
 
 from app.agents.base_agent import AgentResult
+
+
+def _key(text: str) -> str:
+    return re.sub(r"[^a-z]", "", (text or "").lower())
+
+
+def resolve_agent(name: str, candidates) -> object | None:
+    """Match a name the model wrote against an actual agent.
+
+    Agents get named in whichever form the model reaches for: "Wittgenstein",
+    "wittgensteinian", "the Kantian". The original matcher asked whether the
+    written name appeared inside the node label, which fails for every
+    adjectival form — "wittgensteinian" is not a substring of "wittgenstein",
+    it is longer — so nearly every challenge edge was silently dropped and the
+    graph showed a debate in which nobody answered anybody.
+    """
+    want = _key(name)
+    if not want:
+        return None
+    fallback = None
+    for c in candidates:
+        label = _key(getattr(c, "agent_name", None) or c.get("label", "").split(" (")[0])
+        arche = _key(getattr(c, "archetype", None) or c.get("archetype", ""))
+        if want in (label, arche):
+            return c
+        # Containment both ways, so "wittgensteinian" finds Wittgenstein and
+        # "the marxist" finds the marxist. Four characters minimum: shorter
+        # fragments start matching things they should not.
+        for form in (label, arche):
+            if len(form) >= 4 and (form in want or want in form):
+                fallback = fallback or c
+    return fallback
 
 
 def build_argument_graph(all_rounds: list[list[AgentResult]]) -> dict:
@@ -64,11 +97,8 @@ def build_argument_graph(all_rounds: list[list[AgentResult]]) -> dict:
             if pos.round_number == 2 and pos.challenges:
                 for challenge in pos.challenges:
                     target_agent_name = challenge.get("target_agent", "")
-                    # Find the target agent's round 1 node
-                    target_node = next(
-                        (n for n in nodes if target_agent_name.lower() in n.get("label", "").lower() and "R1" in n.get("label", "")),
-                        None,
-                    )
+                    round1_nodes = [n for n in nodes if n.get("round") == 1]
+                    target_node = resolve_agent(target_agent_name, round1_nodes)
                     if target_node:
                         edges.append({
                             "id": str(uuid.uuid4()),

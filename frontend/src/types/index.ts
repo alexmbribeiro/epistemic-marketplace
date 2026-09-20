@@ -168,6 +168,8 @@ export interface Synthesis {
 export interface Debate {
   id: string;
   claim_id: string;
+  claim_content: string | null;
+  claim_category: string | null;
   status: "initializing" | "round1" | "round2" | "round3" | "completed" | "failed";
   agent_ids: string[];
   final_belief_distribution: BeliefDistribution | null;
