@@ -3,7 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.agent import CalibrationRecord, CognitiveAgent
+from app.models.agent import CognitiveAgent
 
 router = APIRouter(prefix="/calibration", tags=["calibration"])
 

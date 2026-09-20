@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -18,6 +19,8 @@ from app.models.claim import Claim
 from app.models.debate import AgentPosition, Argument, Debate
 from app.models.user import User
 from app.schemas.debate import DebateCreate, DebateResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/debates", tags=["debates"])
 
@@ -114,7 +117,9 @@ async def _run_debate_background(debate_id: str, claim_id: str, claim_content: s
 
             await db.commit()
 
-        except Exception as e:
+        except Exception:
+            logger.exception("Debate %s failed", debate_id)
+            await db.rollback()
             debate_result_db = await db.execute(select(Debate).where(Debate.id == uuid.UUID(debate_id)))
             debate = debate_result_db.scalar_one_or_none()
             if debate:

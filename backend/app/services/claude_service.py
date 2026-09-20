@@ -69,13 +69,20 @@ SYNTHESIS_SCHEMA = {
 async def run_agent_turn(system_prompt: str, user_message: str, schema: dict) -> dict:
     client = get_client()
     response = await client.messages.create(
-        model=settings.claude_model,
-        max_tokens=2048,
+        model=settings.agent_model,
+        max_tokens=settings.agent_max_tokens,
         system=system_prompt,
         messages=[{"role": "user", "content": user_message}],
+        thinking={"type": "adaptive"},
+        output_config={"effort": settings.agent_effort},
         tools=[{"name": "output", "description": "Output your structured epistemic position", "input_schema": schema}],
         tool_choice={"type": "tool", "name": "output"},
     )
+    if response.stop_reason == "max_tokens":
+        raise ValueError(
+            f"Agent turn truncated at max_tokens={settings.agent_max_tokens}; "
+            "raise AGENT_MAX_TOKENS or lower AGENT_EFFORT"
+        )
     for block in response.content:
         if block.type == "tool_use" and block.name == "output":
             return block.input
