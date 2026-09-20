@@ -2,7 +2,7 @@
 
 import type { AgentPosition, ArchetypeId } from "@/types";
 import { asText } from "@/lib/text";
-import { agentColor } from "@/lib/agentColors";
+import { colorFrom } from "@/lib/agentColors";
 
 
 function BeliefBar({ score }: { score: number }) {
@@ -21,12 +21,14 @@ function BeliefBar({ score }: { score: number }) {
 interface AgentCardProps {
   position: AgentPosition;
   isLatest?: boolean;
+  /** Assigned per debate — see lib/agentColors. */
+  palette: Record<string, string>;
 }
 
-export default function AgentCard({ position, isLatest = true }: AgentCardProps) {
+export default function AgentCard({ position, isLatest = true, palette }: AgentCardProps) {
   // Same colour the agent carries in the trajectory chart and the exchanges,
   // so identity reads the same everywhere.
-  const color = agentColor(position.archetype);
+  const color = colorFrom(palette, position.archetype);
 
   return (
     <div

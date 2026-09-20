@@ -5,6 +5,7 @@ import { useDebateStore } from "@/store/debate";
 import { useDebateWebSocket } from "@/lib/websocket";
 import { debatesApi } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
+import { paletteFor } from "@/lib/agentColors";
 import AgentCard from "./AgentCard";
 import BeliefDistributionChart from "./BeliefDistribution";
 import ArgumentGraphViz from "./ArgumentGraph";
@@ -53,6 +54,13 @@ export default function DebateRoom({ debateId }: Props) {
   const effectiveUnknowns = unknownUnknowns.length ? unknownUnknowns : debate?.unknown_unknowns || [];
   const effectiveSynthesis = synthesis || debate?.synthesis || null;
 
+  // One assignment for the whole view, so the chart, the cards and the
+  // exchanges agree on who is which colour.
+  const order =
+    effectiveSynthesis?.trajectory?.agents?.map((a) => a.archetype) ??
+    latestPositions.map((p) => p.archetype);
+  const palette = paletteFor(order);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -93,7 +101,7 @@ export default function DebateRoom({ debateId }: Props) {
             </div>
           ) : (
             latestPositions.map((pos) => (
-              <AgentCard key={`${pos.agent_id}-${pos.round_number}`} position={pos} />
+              <AgentCard key={`${pos.agent_id}-${pos.round_number}`} position={pos} palette={palette} />
             ))
           )}
         </div>
@@ -120,7 +128,7 @@ export default function DebateRoom({ debateId }: Props) {
             How Belief Moved
           </h2>
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-            <BeliefTrajectory trajectory={effectiveSynthesis.trajectory} />
+            <BeliefTrajectory trajectory={effectiveSynthesis.trajectory} palette={palette} />
           </div>
         </div>
       ) : null}
@@ -134,7 +142,7 @@ export default function DebateRoom({ debateId }: Props) {
               who challenged whom
             </span>
           </h2>
-          <Exchanges exchanges={effectiveSynthesis.exchanges} />
+          <Exchanges exchanges={effectiveSynthesis.exchanges} palette={palette} />
         </div>
       ) : null}
 

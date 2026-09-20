@@ -11,10 +11,11 @@ import {
   YAxis,
 } from "recharts";
 import type { Trajectory } from "@/types";
-import { SURFACE, agentColor } from "@/lib/agentColors";
+import { SURFACE, colorFrom } from "@/lib/agentColors";
 
 interface Props {
   trajectory: Trajectory;
+  palette: Record<string, string>;
 }
 
 const ROUND_PHASES = ["Independent", "Cross-challenge", "Synthesis"];
@@ -47,7 +48,7 @@ function Tip({ active, payload, label }: { active?: boolean; payload?: TipPayloa
   );
 }
 
-export default function BeliefTrajectory({ trajectory }: Props) {
+export default function BeliefTrajectory({ trajectory, palette }: Props) {
   const { agents } = trajectory;
   if (!agents?.length) return null;
 
@@ -116,10 +117,10 @@ export default function BeliefTrajectory({ trajectory }: Props) {
               key={a.agent_id}
               type="monotone"
               dataKey={a.agent_name}
-              stroke={agentColor(a.archetype)}
+              stroke={colorFrom(palette, a.archetype)}
               strokeWidth={2}
               // 2px surface ring keeps overlapping markers readable
-              dot={{ r: 4, fill: agentColor(a.archetype), stroke: SURFACE, strokeWidth: 2 }}
+              dot={{ r: 4, fill: colorFrom(palette, a.archetype), stroke: SURFACE, strokeWidth: 2 }}
               activeDot={{ r: 6, stroke: SURFACE, strokeWidth: 2 }}
               isAnimationActive={false}
             />
@@ -147,7 +148,7 @@ export default function BeliefTrajectory({ trajectory }: Props) {
                   <span className="flex items-center gap-2">
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: agentColor(a.archetype) }}
+                      style={{ background: colorFrom(palette, a.archetype) }}
                     />
                     <span className="text-slate-300">{a.agent_name}</span>
                     {a.reversed && (

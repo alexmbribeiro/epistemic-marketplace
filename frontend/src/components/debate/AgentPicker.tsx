@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { agentsApi } from "@/lib/api";
-import { agentColor } from "@/lib/agentColors";
+import { MAX_SERIES, paletteFor } from "@/lib/agentColors";
 
 /** The six seeded archetypes. Anything else is opt-in. */
 const DEFAULT_ARCHETYPES = [
@@ -43,6 +43,17 @@ export default function AgentPicker({ selected, onChange }: Props) {
     return <p className="text-xs text-rose-400">No agents available.</p>;
   }
 
+  // Only selected agents carry colour, assigned in selection order. There are
+  // more agents than validated slots, so this shows exactly the colours the
+  // debate will use — and nothing has to be invented for the rest.
+  const byId = new Map(agents.map((a) => [a.id, a]));
+  const palette = paletteFor(
+    selected.flatMap((id) => {
+      const agent = byId.get(id);
+      return agent ? [agent.archetype] : [];
+    })
+  );
+
   const toggle = (id: string) => {
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
   };
@@ -52,27 +63,28 @@ export default function AgentPicker({ selected, onChange }: Props) {
       <div className="flex items-baseline gap-2">
         <label className="text-xs text-slate-500">Agents in this debate</label>
         <span className="text-xs text-slate-600">
-          {selected.length} selected{selected.length < 2 ? " — pick at least two" : ""}
+          {selected.length} selected
+          {selected.length < 2
+            ? " — pick at least two"
+            : selected.length > MAX_SERIES
+            ? ` — at most ${MAX_SERIES}`
+            : ""}
         </span>
         <button
           type="button"
           onClick={() =>
-            onChange(
-              selected.length === agents.length
-                ? agents.filter((a) => DEFAULT_ARCHETYPES.includes(a.archetype)).map((a) => a.id)
-                : agents.map((a) => a.id)
-            )
+            onChange(agents.filter((a) => DEFAULT_ARCHETYPES.includes(a.archetype)).map((a) => a.id))
           }
           className="ml-auto text-xs text-indigo-400 hover:text-indigo-300"
         >
-          {selected.length === agents.length ? "Reset to default six" : "Select all"}
+          Reset to default six
         </button>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {agents.map((a) => {
           const on = selected.includes(a.id);
-          const color = agentColor(a.archetype);
+          const color = palette[a.archetype];
           return (
             <button
               key={a.id}
@@ -88,7 +100,10 @@ export default function AgentPicker({ selected, onChange }: Props) {
             >
               <span
                 className="w-2 h-2 rounded-full shrink-0"
-                style={{ background: on ? color : "transparent", border: `1px solid ${color}` }}
+                style={{
+                  background: on ? color : "transparent",
+                  border: `1px solid ${on ? color : "#475569"}`,
+                }}
               />
               {a.name}
             </button>

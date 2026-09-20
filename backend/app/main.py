@@ -11,39 +11,26 @@ from app.models import Base
 
 async def seed_system_agents():
     from sqlalchemy import select
-    from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.agents import ARCHETYPE_MAP
-    from app.agents.adlerian import AdlerianAgent
-    from app.agents.analogist import AnalogistAgent
-    from app.agents.bayesian import BayesianAgent
-    from app.agents.contrarian import ContrarianAgent
-    from app.agents.dialectician import DialecticianAgent
-    from app.agents.falsificationist import FalsificationistAgent
-    from app.agents.frequentist import FrequentistAgent
+    from app.agents import ARCHETYPE_MAP, SEEDED_ARCHETYPES
     from app.database import AsyncSessionLocal
     from app.models.agent import CognitiveAgent
 
-    system_agents = [
-        BayesianAgent(), FalsificationistAgent(), AnalogistAgent(),
-        ContrarianAgent(), DialecticianAgent(), FrequentistAgent(),
-        AdlerianAgent(),
-    ]
-
     async with AsyncSessionLocal() as db:
-        for agent_cls in system_agents:
+        for archetype in SEEDED_ARCHETYPES:
+            agent = ARCHETYPE_MAP[archetype]()
             existing = await db.execute(
                 select(CognitiveAgent).where(
-                    CognitiveAgent.archetype == agent_cls.archetype,
+                    CognitiveAgent.archetype == agent.archetype,
                     CognitiveAgent.creator_id == None,
                 )
             )
             if not existing.scalar_one_or_none():
                 db.add(CognitiveAgent(
-                    name=agent_cls.name,
-                    archetype=agent_cls.archetype,
-                    system_prompt=agent_cls.system_prompt,
-                    description=agent_cls.description,
+                    name=agent.name,
+                    archetype=agent.archetype,
+                    system_prompt=agent.system_prompt,
+                    description=agent.description,
                     config={},
                     creator_id=None,
                     is_public=True,

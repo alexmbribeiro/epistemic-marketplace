@@ -22,6 +22,8 @@ from app.schemas.debate import DebateCreate, DebateResponse
 
 logger = logging.getLogger(__name__)
 
+MAX_AGENTS_PER_DEBATE = 8
+
 router = APIRouter(prefix="/debates", tags=["debates"])
 
 
@@ -63,6 +65,13 @@ async def create_debate(
         raise HTTPException(
             status_code=400,
             detail="A debate needs at least two agents — one agent cannot disagree with itself",
+        )
+    # Bounded by the categorical palette: past eight series a chart has no
+    # validated colour left to give, and the rounds cost proportionally more.
+    if len(agent_db_records) > MAX_AGENTS_PER_DEBATE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A debate takes at most {MAX_AGENTS_PER_DEBATE} agents; {len(agent_db_records)} were selected",
         )
 
     agent_ids = [rec.id for rec in agent_db_records]

@@ -1,3 +1,8 @@
+/**
+ * The seeded archetypes, plus any string — a user-authored agent can carry an
+ * archetype nobody has seen before, so a closed union here would be a lie.
+ * The `(string & {})` arm keeps autocomplete for the known ones.
+ */
 export type ArchetypeId =
   | "bayesian"
   | "falsificationist"
@@ -5,9 +10,18 @@ export type ArchetypeId =
   | "contrarian"
   | "dialectician"
   | "frequentist"
-  | "adlerian"
   | "domain_expert"
-  | "custom";
+  | "nietzschean"
+  | "jungian"
+  | "aristotelian"
+  | "humean"
+  | "kantian"
+  | "wittgensteinian"
+  | "pragmatist"
+  | "adlerian"
+  | "custom"
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | (string & {});
 
 export interface Claim {
   id: string;

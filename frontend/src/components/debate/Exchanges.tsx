@@ -2,10 +2,11 @@
 
 import type { Exchange } from "@/types";
 import { asText } from "@/lib/text";
-import { agentColor } from "@/lib/agentColors";
+import { colorFrom } from "@/lib/agentColors";
 
 interface Props {
   exchanges: Exchange[];
+  palette: Record<string, string>;
 }
 
 const TYPE_STYLE: Record<string, string> = {
@@ -14,7 +15,7 @@ const TYPE_STYLE: Record<string, string> = {
   redefines: "text-violet-300 border-violet-500/40",
 };
 
-export default function Exchanges({ exchanges }: Props) {
+export default function Exchanges({ exchanges, palette }: Props) {
   if (!exchanges.length) return null;
 
   const byRound = exchanges.reduce<Record<number, Exchange[]>>((acc, e) => {
@@ -33,7 +34,7 @@ export default function Exchanges({ exchanges }: Props) {
                 <span className="flex items-center gap-1.5">
                   <span
                     className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: agentColor(e.from_archetype) }}
+                    style={{ background: colorFrom(palette, e.from_archetype) }}
                   />
                   <span className="text-slate-300 font-medium">{asText(e.from_agent)}</span>
                 </span>
