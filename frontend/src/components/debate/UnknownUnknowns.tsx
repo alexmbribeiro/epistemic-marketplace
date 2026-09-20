@@ -1,5 +1,7 @@
 "use client";
 
+import { asText } from "@/lib/text";
+
 interface Props {
   questions: string[];
 }
@@ -18,7 +20,7 @@ export default function UnknownUnknowns({ questions }: Props) {
         {questions.map((q, i) => (
           <li key={i} className="text-sm text-rose-200/70 flex gap-2">
             <span className="text-rose-600 shrink-0 font-mono text-xs mt-0.5">{String(i + 1).padStart(2, "0")}</span>
-            {q}
+            {asText(q)}
           </li>
         ))}
       </ul>

@@ -25,11 +25,65 @@ class IncompleteOutput(Exception):
     """
 
 
+def _unwrap(value):
+    """Gemini wraps scalars in single-key objects often enough to matter:
+    cruxes comes back as [{"crux": "..."}] instead of ["..."]. The content is
+    right, only the shape is wrong, so unwrap rather than reject."""
+    if isinstance(value, dict) and len(value) == 1:
+        inner = next(iter(value.values()))
+        if isinstance(inner, (str, int, float, bool)):
+            return inner
+    return value
+
+
+def _coerce(payload: dict, schema: dict) -> dict:
+    """Force a response to match its declared schema.
+
+    Gemini's function calling treats the schema as a strong hint, not a
+    contract: it drops required fields, invents enum values, and wraps string
+    array items in objects. Anything that reaches the database or the
+    websocket has to match the shape the frontend is typed against.
+    """
+    props = schema.get("properties", {})
+    out: dict = {}
+
+    for key, value in payload.items():
+        spec = props.get(key)
+        if not spec:
+            out[key] = value
+            continue
+
+        kind = spec.get("type")
+        items = spec.get("items", {})
+
+        if kind == "array":
+            seq = value if isinstance(value, list) else [value]
+            if items.get("type") == "object":
+                out[key] = [_coerce(v, items) for v in seq if isinstance(v, dict)]
+            else:
+                out[key] = [str(_unwrap(v)) for v in seq]
+        elif "enum" in spec and value not in spec["enum"]:
+            fallback = "uncertain" if "uncertain" in spec["enum"] else spec["enum"][0]
+            logger.warning("Coercing %s=%r to %r (outside enum)", key, value, fallback)
+            out[key] = fallback
+        elif kind == "string" and not isinstance(value, str):
+            out[key] = str(_unwrap(value))
+        elif kind == "number" and not isinstance(value, (int, float)):
+            try:
+                out[key] = float(_unwrap(value))
+            except (TypeError, ValueError):
+                out[key] = value
+        else:
+            out[key] = value
+
+    return out
+
+
 def _validate(payload: dict, schema: dict) -> dict:
     missing = sorted(set(schema.get("required", [])) - set(payload))
     if missing:
         raise IncompleteOutput(f"missing required fields: {', '.join(missing)}")
-    return payload
+    return _coerce(payload, schema)
 
 # A debate fans out to six agents per round. Firing all six at a free-tier
 # per-minute limit gets most of them 429'd, and then they all back off in

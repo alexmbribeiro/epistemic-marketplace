@@ -1,6 +1,7 @@
 "use client";
 
 import type { AgentPosition, ArchetypeId } from "@/types";
+import { asText } from "@/lib/text";
 
 const ARCHETYPE_COLORS: Record<ArchetypeId | string, string> = {
   bayesian: "border-violet-500 bg-violet-950/30",
@@ -78,7 +79,7 @@ export default function AgentCard({ position, isLatest = true }: AgentCardProps)
             {position.cruxes.slice(0, 2).map((c, i) => (
               <li key={i} className="text-xs text-slate-400 flex gap-1">
                 <span className="text-amber-500 shrink-0">→</span>
-                {c}
+                {asText(c)}
               </li>
             ))}
           </ul>
@@ -92,7 +93,7 @@ export default function AgentCard({ position, isLatest = true }: AgentCardProps)
             {position.unanswered_questions.slice(0, 1).map((q, i) => (
               <li key={i} className="text-xs text-rose-400/80 flex gap-1">
                 <span className="shrink-0">?</span>
-                {q}
+                {asText(q)}
               </li>
             ))}
           </ul>
