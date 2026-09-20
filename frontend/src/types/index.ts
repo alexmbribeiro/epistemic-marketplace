@@ -194,3 +194,30 @@ export interface AllPositions {
   round2: AgentPosition[];
   round3: AgentPosition[];
 }
+
+
+export interface LeaderboardEntry {
+  agent_id: string;
+  name: string;
+  archetype: ArchetypeId;
+  description: string;
+  elo_rating: number;
+  debates_rated_in: number;
+  debates_judged: number;
+  /** Under five rated debates the number is mostly noise. */
+  provisional: boolean;
+  criteria: {
+    method_fidelity: number;
+    engagement: number;
+    crux_quality: number;
+    responsiveness: number;
+    ratings_received: number;
+  } | null;
+}
+
+export interface JudgeBiasRow {
+  judge: string;
+  subject: string;
+  mean_score: number;
+  n: number;
+}

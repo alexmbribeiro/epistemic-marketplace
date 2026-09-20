@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Claim, CognitiveAgent, Debate } from "@/types";
+import type { Claim, CognitiveAgent, Debate, JudgeBiasRow, LeaderboardEntry } from "@/types";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
@@ -43,10 +43,8 @@ export const agentsApi = {
 };
 
 export const calibrationApi = {
-  leaderboard: () =>
-    api.get<{ agent_id: string; name: string; archetype: string; reputation_score: number; description: string }[]>(
-      "/calibration/leaderboard"
-    ).then((r) => r.data),
+  leaderboard: () => api.get<LeaderboardEntry[]>("/calibration/leaderboard").then((r) => r.data),
+  judgeBias: () => api.get<JudgeBiasRow[]>("/calibration/judge-bias").then((r) => r.data),
 };
 
 export const authApi = {

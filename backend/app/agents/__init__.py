@@ -1,13 +1,6 @@
 from app.agents.adlerian import AdlerianAgent
-from app.agents.analogist import AnalogistAgent
 from app.agents.aristotle import AristotelianAgent
 from app.agents.base_agent import AgentResult, BaseAgent
-from app.agents.bayesian import BayesianAgent
-from app.agents.contrarian import ContrarianAgent
-from app.agents.dialectician import DialecticianAgent
-from app.agents.domain_expert import DomainExpertAgent
-from app.agents.falsificationist import FalsificationistAgent
-from app.agents.frequentist import FrequentistAgent
 from app.agents.hume import HumeanAgent
 from app.agents.jung import JungianAgent
 from app.agents.kant import KantianAgent
@@ -15,19 +8,11 @@ from app.agents.nietzsche import NietzscheanAgent
 from app.agents.pragmatist import PragmatistAgent
 from app.agents.wittgenstein import WittgensteinianAgent
 
+# Each is here for a test none of the others makes: genealogy, symbolic
+# compensation, the four causes, impressions and the is/ought gap, conditions
+# of possibility, grammatical dissolution, practical consequences, purpose
+# over cause.
 ARCHETYPE_MAP = {
-    # Method archetypes
-    "bayesian": BayesianAgent,
-    "falsificationist": FalsificationistAgent,
-    "analogist": AnalogistAgent,
-    "contrarian": ContrarianAgent,
-    "dialectician": DialecticianAgent,
-    "frequentist": FrequentistAgent,
-    "domain_expert": DomainExpertAgent,
-    # Thinkers. Each is here for a test none of the others makes, not for the
-    # name: genealogy, symbolic compensation, the four causes, impressions and
-    # the is/ought gap, conditions of possibility, grammatical dissolution,
-    # practical consequences, purpose over cause.
     "nietzschean": NietzscheanAgent,
     "jungian": JungianAgent,
     "aristotelian": AristotelianAgent,
@@ -38,32 +23,21 @@ ARCHETYPE_MAP = {
     "adlerian": AdlerianAgent,
 }
 
-# Used when a debate does not name its agents.
-DEFAULT_ARCHETYPES = [
-    "bayesian",
-    "falsificationist",
-    "analogist",
-    "contrarian",
-    "dialectician",
-    "frequentist",
-]
+SEEDED_ARCHETYPES = list(ARCHETYPE_MAP)
 
-THINKER_ARCHETYPES = [
+# How many stay out of a debate to judge it. A debate cannot take every
+# philosopher or there is nobody left who did not take part.
+JURY_SIZE = 3
+
+# Five debating leaves exactly three to judge, which is the whole roster
+# accounted for. Fewer debating means the jury is actually sampled.
+DEFAULT_ARCHETYPES = [
     "nietzschean",
-    "jungian",
-    "aristotelian",
     "humean",
     "kantian",
-    "wittgensteinian",
-    "pragmatist",
-    "adlerian",
+    "aristotelian",
+    "jungian",
 ]
-
-# Seeded at startup and selectable. domain_expert is excluded: it is a shell
-# that needs a domain in its config, so it is authored per use rather than
-# seeded. A thinker is selectable but never default — it joins because
-# someone chose it.
-SEEDED_ARCHETYPES = DEFAULT_ARCHETYPES + THINKER_ARCHETYPES
 
 
 def build_agent(

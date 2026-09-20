@@ -75,3 +75,25 @@ class CalibrationRecord(Base):
 
     claim = relationship("Claim", back_populates="calibration_records")
     agent = relationship("CognitiveAgent", back_populates="calibration_records")
+
+
+class JuryRating(Base):
+    """One judge's verdict on one participant of one debate.
+
+    Judges are drawn from philosophers who did not take part, so nobody rates
+    themselves. Scores are on craft, not agreement — see the judge prompt.
+    """
+
+    __tablename__ = "jury_ratings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    debate_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("debates.id"), nullable=False)
+    judge_agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cognitive_agents.id"), nullable=False)
+    subject_agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cognitive_agents.id"), nullable=False)
+    method_fidelity: Mapped[int] = mapped_column(Integer, nullable=False)
+    engagement: Mapped[int] = mapped_column(Integer, nullable=False)
+    crux_quality: Mapped[int] = mapped_column(Integer, nullable=False)
+    responsiveness: Mapped[int] = mapped_column(Integer, nullable=False)
+    overall: Mapped[float] = mapped_column(Float, nullable=False)
+    comment: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
