@@ -8,7 +8,7 @@ import type { ArchetypeId } from "@/types";
  * step — fails validation against this app's #0a0f1e surface: blue and cyan
  * sit at ΔE 13.2 for *normal* vision (below the 15 floor), and emerald and
  * rose collapse to ΔE 4.6 under deuteranopia. This set passes every check:
- * worst adjacent CVD ΔE 8.4, worst adjacent normal-vision ΔE 19.3, all six
+ * worst adjacent CVD ΔE 8.4, worst adjacent normal-vision ΔE 19.3, all seven
  * above 3:1 contrast.
  *
  * Assign in this fixed order and never cycle it — colour follows the agent,
@@ -21,8 +21,9 @@ export const SERIES_COLORS: Record<ArchetypeId, string> = {
   contrarian: "#c98500",
   dialectician: "#d55181",
   frequentist: "#008300",
-  domain_expert: "#9085e9",
-  custom: "#e66767",
+  adlerian: "#9085e9",
+  domain_expert: "#e66767",
+  custom: "#94a3b8",
 };
 
 export const SURFACE = "#0a0f1e";

@@ -5,6 +5,7 @@ export type ArchetypeId =
   | "contrarian"
   | "dialectician"
   | "frequentist"
+  | "adlerian"
   | "domain_expert"
   | "custom";
 

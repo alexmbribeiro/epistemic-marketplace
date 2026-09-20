@@ -14,6 +14,7 @@ async def seed_system_agents():
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.agents import ARCHETYPE_MAP
+    from app.agents.adlerian import AdlerianAgent
     from app.agents.analogist import AnalogistAgent
     from app.agents.bayesian import BayesianAgent
     from app.agents.contrarian import ContrarianAgent
@@ -26,6 +27,7 @@ async def seed_system_agents():
     system_agents = [
         BayesianAgent(), FalsificationistAgent(), AnalogistAgent(),
         ContrarianAgent(), DialecticianAgent(), FrequentistAgent(),
+        AdlerianAgent(),
     ]
 
     async with AsyncSessionLocal() as db:

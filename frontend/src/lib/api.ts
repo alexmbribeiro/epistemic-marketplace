@@ -25,7 +25,7 @@ export const debatesApi = {
   list: (limit = 20, offset = 0) =>
     api.get<Debate[]>("/debates/", { params: { limit, offset } }).then((r) => r.data),
   get: (id: string) => api.get<Debate>(`/debates/${id}`).then((r) => r.data),
-  create: (body: { claim_id: string; agent_archetypes?: string[] }) =>
+  create: (body: { claim_id: string; agent_ids?: string[]; agent_archetypes?: string[] }) =>
     api.post<Debate>("/debates/", body).then((r) => r.data),
 };
 

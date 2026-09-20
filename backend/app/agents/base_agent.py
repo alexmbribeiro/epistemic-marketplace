@@ -30,9 +30,26 @@ class BaseAgent:
     description: str = ""
     system_prompt: str = ""
 
-    def __init__(self, agent_id: str | None = None, config: dict | None = None):
+    def __init__(
+        self,
+        agent_id: str | None = None,
+        config: dict | None = None,
+        system_prompt: str | None = None,
+        name: str | None = None,
+        archetype: str | None = None,
+    ):
         self.agent_id = agent_id or str(uuid.uuid4())
         self.config = config or {}
+        # The stored record wins over the class defaults. For the six seeded
+        # archetypes these are identical; for a user-authored agent the record
+        # is the only source of a persona, and without this it would debate
+        # with an empty system prompt.
+        if system_prompt:
+            self.system_prompt = system_prompt
+        if name:
+            self.name = name
+        if archetype:
+            self.archetype = archetype
 
     def _build_system_prompt(self) -> str:
         return self.system_prompt

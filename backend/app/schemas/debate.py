@@ -6,6 +6,9 @@ from pydantic import BaseModel
 
 class DebateCreate(BaseModel):
     claim_id: uuid.UUID
+    # Preferred: pick exact agents, which is the only way a user-authored one
+    # can take part. agent_archetypes stays for the seeded six.
+    agent_ids: list[uuid.UUID] | None = None
     agent_archetypes: list[str] | None = None
 
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { claimsApi, debatesApi } from "@/lib/api";
+import AgentPicker from "@/components/debate/AgentPicker";
 
 const CATEGORIES = ["science", "philosophy", "economics", "ethics", "politics", "other"];
 
@@ -13,15 +14,20 @@ export default function HomePage() {
   const [isVerifiable, setIsVerifiable] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [agentIds, setAgentIds] = useState<string[]>([]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!content.trim()) return;
+    if (agentIds.length < 2) {
+      setError("Pick at least two agents — a debate needs someone to disagree.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
       const claim = await claimsApi.create({ content: content.trim(), category, is_verifiable: isVerifiable });
-      const debate = await debatesApi.create({ claim_id: claim.id });
+      const debate = await debatesApi.create({ claim_id: claim.id, agent_ids: agentIds });
       router.push(`/debates/${debate.id}`);
     } catch {
       setError("Failed to start debate. Make sure the backend is running.");
@@ -36,7 +42,7 @@ export default function HomePage() {
           Epistemic Marketplace
         </h1>
         <p className="text-slate-400 text-lg">
-          Submit a claim. Six AI agents with distinct cognitive architectures debate its truth.
+          Submit a claim. Agents with distinct cognitive architectures debate its truth.
           <br />
           The output isn't an answer — it's a{" "}
           <span className="text-indigo-300 font-medium">map of uncertainty</span>.
@@ -100,11 +106,13 @@ export default function HomePage() {
           </div>
         </div>
 
+        <AgentPicker selected={agentIds} onChange={setAgentIds} />
+
         {error && <p className="text-rose-400 text-sm">{error}</p>}
 
         <button
           type="submit"
-          disabled={loading || !content.trim()}
+          disabled={loading || !content.trim() || agentIds.length < 2}
           className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3 rounded-lg transition-colors text-sm"
         >
           {loading ? "Starting debate..." : "Start Debate →"}

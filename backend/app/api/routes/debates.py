@@ -37,18 +37,33 @@ async def create_debate(
         raise HTTPException(status_code=404, detail="Claim not found")
 
     # Resolve which agents to use
-    archetypes = body.agent_archetypes or DEFAULT_ARCHETYPES
-    agent_db_records = []
-    for archetype in archetypes:
-        result = await db.execute(
-            select(CognitiveAgent).where(CognitiveAgent.archetype == archetype, CognitiveAgent.creator_id == None)
-        )
-        rec = result.scalar_one_or_none()
-        if rec:
-            agent_db_records.append(rec)
+    if body.agent_ids:
+        result = await db.execute(select(CognitiveAgent).where(CognitiveAgent.id.in_(body.agent_ids)))
+        found = {rec.id: rec for rec in result.scalars().all()}
+        missing = [str(i) for i in body.agent_ids if i not in found]
+        if missing:
+            raise HTTPException(status_code=404, detail=f"Unknown agent(s): {', '.join(missing)}")
+        # Preserve the order the caller asked for.
+        agent_db_records = [found[i] for i in body.agent_ids]
+        for rec in agent_db_records:
+            if not rec.is_public and (current_user is None or rec.creator_id != current_user.id):
+                raise HTTPException(status_code=403, detail=f"Agent '{rec.name}' is private")
+    else:
+        archetypes = body.agent_archetypes or DEFAULT_ARCHETYPES
+        agent_db_records = []
+        for archetype in archetypes:
+            result = await db.execute(
+                select(CognitiveAgent).where(CognitiveAgent.archetype == archetype, CognitiveAgent.creator_id == None)
+            )
+            rec = result.scalar_one_or_none()
+            if rec:
+                agent_db_records.append(rec)
 
-    if not agent_db_records:
-        raise HTTPException(status_code=400, detail="No agents available for selected archetypes")
+    if len(agent_db_records) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="A debate needs at least two agents — one agent cannot disagree with itself",
+        )
 
     agent_ids = [rec.id for rec in agent_db_records]
     debate = Debate(
@@ -74,7 +89,10 @@ async def _run_debate_background(debate_id: str, claim_id: str, claim_content: s
     async with AsyncSessionLocal() as db:
         try:
             # Build agent instances
-            agents = [build_agent(rec.archetype, str(rec.id), rec.config) for rec in agent_records]
+            agents = [
+                build_agent(rec.archetype, str(rec.id), rec.config, rec.system_prompt, rec.name)
+                for rec in agent_records
+            ]
             reputation_map = {str(rec.id): rec.reputation_score for rec in agent_records}
 
             # Update status to round1
