@@ -1,0 +1,102 @@
+import uuid
+
+from app.agents.base_agent import AgentResult
+
+
+def build_argument_graph(all_rounds: list[list[AgentResult]]) -> dict:
+    """
+    Build a D3-compatible force-directed graph from all debate rounds.
+    Returns {nodes: [...], edges: [...]}
+    """
+    nodes = []
+    edges = []
+    seen_nodes = set()
+
+    # Root node: the claim itself
+    claim_node_id = "claim_root"
+    nodes.append({
+        "id": claim_node_id,
+        "label": "Claim",
+        "type": "claim",
+        "group": 0,
+    })
+
+    for round_positions in all_rounds:
+        for pos in round_positions:
+            node_id = f"{pos.agent_id}_r{pos.round_number}"
+            if node_id not in seen_nodes:
+                seen_nodes.add(node_id)
+                nodes.append({
+                    "id": node_id,
+                    "label": f"{pos.agent_name} (R{pos.round_number})",
+                    "archetype": pos.archetype,
+                    "belief_score": pos.belief_score,
+                    "argument_content": pos.argument_content,
+                    "round": pos.round_number,
+                    "type": "position",
+                    "group": pos.round_number,
+                })
+
+            # Edge from this position to the claim root (round 1) or to previous round position
+            if pos.round_number == 1:
+                edges.append({
+                    "id": str(uuid.uuid4()),
+                    "source": node_id,
+                    "target": claim_node_id,
+                    "type": pos.argument_type,
+                    "strength": pos.argument_strength,
+                    "label": pos.argument_type,
+                })
+            else:
+                # Connect to same agent's previous round
+                prev_node_id = f"{pos.agent_id}_r{pos.round_number - 1}"
+                if prev_node_id in seen_nodes:
+                    edges.append({
+                        "id": str(uuid.uuid4()),
+                        "source": node_id,
+                        "target": prev_node_id,
+                        "type": "updates",
+                        "strength": 0.5,
+                        "label": "updates",
+                    })
+
+            # Cross-agent challenge edges (round 2)
+            if pos.round_number == 2 and pos.challenges:
+                for challenge in pos.challenges:
+                    target_agent_name = challenge.get("target_agent", "")
+                    # Find the target agent's round 1 node
+                    target_node = next(
+                        (n for n in nodes if target_agent_name.lower() in n.get("label", "").lower() and "R1" in n.get("label", "")),
+                        None,
+                    )
+                    if target_node:
+                        edges.append({
+                            "id": str(uuid.uuid4()),
+                            "source": node_id,
+                            "target": target_node["id"],
+                            "type": challenge.get("type", "contradicts"),
+                            "strength": 0.8,
+                            "label": challenge.get("type", "contradicts"),
+                            "challenge_text": challenge.get("challenge", ""),
+                        })
+
+    return {"nodes": nodes, "edges": edges}
+
+
+def extract_unknown_unknowns(all_rounds: list[list[AgentResult]]) -> list[str]:
+    """Collect questions that no agent could answer."""
+    all_questions = []
+    for round_positions in all_rounds:
+        for pos in round_positions:
+            all_questions.extend(pos.unanswered_questions)
+
+    # Deduplicate roughly (a full version would cluster semantically)
+    seen = set()
+    unique = []
+    for q in all_questions:
+        q_normalized = q.lower().strip()
+        if q_normalized not in seen and q_normalized:
+            seen.add(q_normalized)
+            unique.append(q)
+
+    return unique[:10]  # Top 10 unknown unknowns
