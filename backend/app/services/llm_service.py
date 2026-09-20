@@ -14,6 +14,15 @@ logger = logging.getLogger(__name__)
 _RETRYABLE_CODES = {429, 500, 502, 503, 504}
 
 
+class NoToolCall(Exception):
+    """The live session ended without the model calling `output`.
+
+    It sometimes answers conversationally instead of invoking the function.
+    Same class of flake as IncompleteOutput — re-ask rather than kill the
+    debate, which is what a bare ValueError did here before.
+    """
+
+
 class IncompleteOutput(Exception):
     """The model answered but left required fields out.
 
@@ -231,7 +240,7 @@ async def _live_turn(system_prompt: str, user_message: str, schema: dict) -> dic
             if server_content and getattr(server_content, "turn_complete", False):
                 break
 
-    raise ValueError("Live session ended without calling output")
+    raise NoToolCall("live session ended without calling output")
 
 
 async def _live_turn_with_retry(system_prompt: str, user_message: str, schema: dict) -> dict:
@@ -246,7 +255,7 @@ async def _live_turn_with_retry(system_prompt: str, user_message: str, schema: d
             status = getattr(exc, "status_code", None)
             retryable = (
                 status in _RETRYABLE_CODES
-                or isinstance(exc, (asyncio.TimeoutError, IncompleteOutput))
+                or isinstance(exc, (asyncio.TimeoutError, IncompleteOutput, NoToolCall))
             )
             if not retryable or attempt == settings.agent_max_retries:
                 raise

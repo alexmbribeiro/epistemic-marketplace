@@ -151,10 +151,26 @@ async def debate_websocket(websocket: WebSocket, debate_id: str):
 
     try:
         async for message in pubsub.listen():
-            if message["type"] == "message":
-                await websocket.send_text(message["data"])
+            if message["type"] != "message":
+                continue
+            await websocket.send_text(message["data"])
+            # Close cleanly once the debate is over instead of leaving the
+            # socket open forever on a channel that will never speak again.
+            try:
+                if json.loads(message["data"]).get("event") == "debate_complete":
+                    break
+            except (ValueError, AttributeError):
+                pass
     except WebSocketDisconnect:
         pass
+    except Exception:
+        # A client that goes away mid-send raises from send_text, not on
+        # receive, so WebSocketDisconnect alone does not cover it.
+        logger.info("Websocket for debate %s ended", debate_id, exc_info=True)
     finally:
         await pubsub.unsubscribe(f"debate:{debate_id}")
         await redis.aclose()
+        try:
+            await websocket.close()
+        except Exception:
+            pass
