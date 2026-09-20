@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass, field
 
-from app.services import claude_service
+from app.services import llm_service
 
 
 @dataclass
@@ -44,10 +44,10 @@ CLAIM: "{claim}"
 
 Evaluate this claim independently. Do not assume consensus. Apply your cognitive architecture strictly."""
 
-        result = await claude_service.run_agent_turn(
+        result = await llm_service.run_agent_turn(
             self._build_system_prompt(),
             prompt,
-            claude_service.POSITION_SCHEMA,
+            llm_service.POSITION_SCHEMA,
         )
         return AgentResult(
             agent_id=self.agent_id,
@@ -69,10 +69,10 @@ Other agents have formed their initial positions:
 
 Now review these positions and form your updated position. Challenge positions you disagree with. Specify which agent you are challenging and why."""
 
-        result = await claude_service.run_agent_turn(
+        result = await llm_service.run_agent_turn(
             self._build_system_prompt(),
             prompt,
-            claude_service.CHALLENGE_SCHEMA,
+            llm_service.CHALLENGE_SCHEMA,
         )
         return AgentResult(
             agent_id=self.agent_id,
@@ -102,10 +102,10 @@ ROUND 2 — Cross-challenges:
 
 Now synthesize. Has your view changed? Why or why not? Provide your final position."""
 
-        result = await claude_service.run_agent_turn(
+        result = await llm_service.run_agent_turn(
             self._build_system_prompt(),
             prompt,
-            claude_service.SYNTHESIS_SCHEMA,
+            llm_service.SYNTHESIS_SCHEMA,
         )
         return AgentResult(
             agent_id=self.agent_id,

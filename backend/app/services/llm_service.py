@@ -1,14 +1,25 @@
-import anthropic
+import asyncio
+import json
+import logging
+import random
+
+from google import genai
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+# 429 is the one that matters: a debate fires six calls at once, three rounds
+# running, which trips free-tier per-minute limits easily.
+_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 
 _client = None
 
 
-def get_client() -> anthropic.AsyncAnthropic:
+def get_client() -> genai.Client:
     global _client
     if _client is None:
-        _client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        _client = genai.Client(api_key=settings.gemini_api_key)
     return _client
 
 
@@ -66,24 +77,53 @@ SYNTHESIS_SCHEMA = {
 }
 
 
+async def _create_with_retry(client: genai.Client, **kwargs):
+    # Matched on the status_code attribute rather than an exception class on
+    # purpose: the SDK raises from google.genai._gaos.lib.compat_errors, which
+    # is not a subclass of the public google.genai.errors.APIError and is not
+    # re-exported anywhere public. Duck-typing survives that being reshuffled.
+    for attempt in range(settings.agent_max_retries + 1):
+        try:
+            return await client.aio.interactions.create(**kwargs)
+        except Exception as exc:
+            retryable = getattr(exc, "status_code", None) in _RETRYABLE_CODES
+            if not retryable or attempt == settings.agent_max_retries:
+                raise
+            delay = min(2**attempt, 30) + random.uniform(0, 1)
+            logger.warning(
+                "Gemini %s, retrying in %.1fs (attempt %d/%d)",
+                getattr(exc, "status_code", "?"), delay, attempt + 1, settings.agent_max_retries,
+            )
+            await asyncio.sleep(delay)
+
+
 async def run_agent_turn(system_prompt: str, user_message: str, schema: dict) -> dict:
     client = get_client()
-    response = await client.messages.create(
+    interaction = await _create_with_retry(
+        client,
         model=settings.agent_model,
-        max_tokens=settings.agent_max_tokens,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_message}],
-        thinking={"type": "adaptive"},
-        output_config={"effort": settings.agent_effort},
-        tools=[{"name": "output", "description": "Output your structured epistemic position", "input_schema": schema}],
-        tool_choice={"type": "tool", "name": "output"},
+        input=user_message,
+        system_instruction=system_prompt,
+        response_format={
+            "type": "text",
+            "mime_type": "application/json",
+            "schema": schema,
+        },
+        generation_config={
+            "max_output_tokens": settings.agent_max_tokens,
+            "thinking_level": settings.agent_thinking_level,
+        },
     )
-    if response.stop_reason == "max_tokens":
+
+    raw = interaction.output_text
+    if not raw:
+        # Usually means the response hit max_output_tokens before closing the
+        # JSON, or a safety filter dropped it. Either way there is nothing to parse.
         raise ValueError(
-            f"Agent turn truncated at max_tokens={settings.agent_max_tokens}; "
-            "raise AGENT_MAX_TOKENS or lower AGENT_EFFORT"
+            f"Gemini returned no text (status={interaction.status}); "
+            f"raise AGENT_MAX_TOKENS or lower AGENT_THINKING_LEVEL"
         )
-    for block in response.content:
-        if block.type == "tool_use" and block.name == "output":
-            return block.input
-    raise ValueError("No structured output returned from Claude")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Gemini returned malformed JSON: {raw[:200]}") from exc
