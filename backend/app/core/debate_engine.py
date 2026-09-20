@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -10,6 +11,11 @@ from app.agents.base_agent import BaseAgent
 from app.config import settings
 from app.core.aggregator import compute_belief_distribution
 from app.core.argument_graph import build_argument_graph, extract_unknown_unknowns
+from app.core.synthesis import build_trajectory, extract_exchanges, fallback_conclusion
+from app.services import llm_service
+
+
+logger = logging.getLogger(__name__)
 
 
 async def _get_redis() -> aioredis.Redis:
@@ -95,11 +101,42 @@ async def run_debate(
     # Unknown unknowns
     unknowns = extract_unknown_unknowns([list(round1), list(round2), list(round3)])
 
+    # How belief actually moved, and who argued with whom
+    rounds = [list(round1), list(round2), list(round3)]
+    trajectory = build_trajectory(rounds)
+    exchanges = extract_exchanges(rounds)
+
+    await emit("synthesising", {"debate_id": debate_id})
+    try:
+        conclusion = await llm_service.synthesize_conclusion(
+            claim_content, list(round3), distribution, trajectory
+        )
+    except Exception:
+        # A debate that produced three full rounds must not be thrown away
+        # because the closing summary failed.
+        logger.warning("Conclusion synthesis failed; using computed fallback", exc_info=True)
+        conclusion = fallback_conclusion(distribution, trajectory)
+
+    synthesis = {
+        "conclusion": conclusion,
+        "trajectory": trajectory,
+        "exchanges": exchanges,
+        # The agent_positions table stores no archetype, argument_type or
+        # argument_content, so a completed debate loaded fresh had nothing to
+        # render its cards from. Keep the full rounds here.
+        "positions": {
+            "round1": [_result_to_dict(r) for r in round1],
+            "round2": [_result_to_dict(r) for r in round2],
+            "round3": [_result_to_dict(r) for r in round3],
+        },
+    }
+
     result = {
         "debate_id": debate_id,
         "final_belief_distribution": distribution,
         "argument_graph": graph,
         "unknown_unknowns": unknowns,
+        "synthesis": synthesis,
         "all_positions": {
             "round1": [_result_to_dict(r) for r in round1],
             "round2": [_result_to_dict(r) for r in round2],

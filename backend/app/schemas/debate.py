@@ -17,6 +17,7 @@ class DebateResponse(BaseModel):
     final_belief_distribution: dict | None
     argument_graph: dict | None
     unknown_unknowns: list[str] | None
+    synthesis: dict | None
     created_at: datetime
     completed_at: datetime | None
 

@@ -102,6 +102,53 @@ export interface ArgumentGraph {
   edges: ArgumentEdge[];
 }
 
+export interface TrajectoryAgent {
+  agent_id: string;
+  agent_name: string;
+  archetype: ArchetypeId;
+  beliefs: number[];
+  /** Net change, first round to last. */
+  shift: number;
+  /** Total distance travelled across rounds — catches an agent that moved and came back. */
+  /** Absent on debates recorded before this metric existed. */
+  swing?: number;
+  moved: boolean;
+  reversed: boolean;
+}
+
+export interface Trajectory {
+  agents: TrajectoryAgent[];
+  spread_per_round: number[];
+  convergence: "converged" | "diverged" | "unchanged" | null;
+  biggest_mover: TrajectoryAgent | null;
+  anchored: string[];
+  reversals: string[];
+}
+
+export interface Exchange {
+  round: number;
+  from_agent: string;
+  from_archetype: ArchetypeId;
+  to_agent: string;
+  type: "contradicts" | "qualifies" | "redefines";
+  text: string;
+}
+
+export interface Conclusion {
+  verdict: string;
+  reasoning: string;
+  consensus: "strong_agreement" | "leaning" | "contested" | "deadlocked";
+  what_would_settle_it: string[];
+  generated: boolean;
+}
+
+export interface Synthesis {
+  conclusion: Conclusion;
+  trajectory: Trajectory;
+  exchanges: Exchange[];
+  positions?: AllPositions;
+}
+
 export interface Debate {
   id: string;
   claim_id: string;
@@ -110,6 +157,7 @@ export interface Debate {
   final_belief_distribution: BeliefDistribution | null;
   argument_graph: ArgumentGraph | null;
   unknown_unknowns: string[] | null;
+  synthesis: Synthesis | null;
   created_at: string;
   completed_at: string | null;
 }
@@ -121,6 +169,7 @@ export interface DebateEvent {
     | "round1_complete"
     | "round2_complete"
     | "round3_complete"
+    | "synthesising"
     | "debate_complete";
   data: Record<string, unknown>;
 }

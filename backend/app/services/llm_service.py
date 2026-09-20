@@ -194,6 +194,61 @@ async def _create_with_retry(client: genai.Client, **kwargs):
             await asyncio.sleep(delay)
 
 
+CONCLUSION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verdict": {"type": "string", "description": "One sentence stating what the debate concluded, hedged to match the actual spread of agent belief"},
+        "reasoning": {"type": "string", "description": "Two to four sentences on how the agents got there and where they split"},
+        "consensus": {"type": "string", "enum": ["strong_agreement", "leaning", "contested", "deadlocked"]},
+        "what_would_settle_it": {"type": "array", "items": {"type": "string"}, "description": "Concrete evidence or observations that would actually resolve the disagreement"},
+    },
+    "required": ["verdict", "reasoning", "consensus", "what_would_settle_it"],
+}
+
+SYNTHESIST_PROMPT = """You are the synthesist of an epistemic marketplace. Six agents with different cognitive architectures have just debated a claim for three rounds.
+
+Your job is to state what the debate actually established — not to decide who won, and not to resolve a disagreement the agents did not resolve.
+
+RULES:
+- Your verdict must match the numbers. If the agents are split, say so; do not manufacture
+  a consensus that the spread does not support.
+- Name the real point of contention, not a generic summary.
+- "what_would_settle_it" must be concrete and checkable: an observation, a study design, a
+  measurement. Not "more research".
+- Report movement honestly: if an agent changed its mind, that is the interesting part.
+- Never state more certainty than the weighted belief and spread justify."""
+
+
+async def synthesize_conclusion(claim: str, round3, distribution: dict, trajectory: dict) -> dict:
+    """One extra call that turns the final positions into a readable verdict."""
+    positions = "\n".join(
+        f"- {r.agent_name} ({r.archetype}): {r.belief_score:.2f} — {r.argument_content}"
+        for r in round3
+    )
+    moves = "\n".join(
+        f"- {a['agent_name']}: {a['beliefs'][0]:.2f} -> {a['beliefs'][-1]:.2f} ({a['shift']:+.2f})"
+        for a in trajectory.get("agents", [])
+    )
+    message = f"""CLAIM: "{claim}"
+
+FINAL POSITIONS:
+{positions}
+
+HOW BELIEF MOVED ACROSS THE THREE ROUNDS:
+{moves}
+
+Weighted belief: {distribution.get('weighted_mean')}
+Spread (std): {distribution.get('std')}
+The group {trajectory.get('convergence') or 'did not measurably move'} over the debate.
+Primary crux: {distribution.get('disagreement_zone')}
+
+Synthesise the conclusion."""
+
+    result = await run_agent_turn(SYNTHESIST_PROMPT, message, CONCLUSION_SCHEMA)
+    result["generated"] = True
+    return result
+
+
 async def _live_turn(system_prompt: str, user_message: str, schema: dict) -> dict:
     """Run one agent turn over the Live (websocket) API.
 

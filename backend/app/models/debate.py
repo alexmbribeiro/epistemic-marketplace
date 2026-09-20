@@ -18,6 +18,8 @@ class Debate(Base):
     final_belief_distribution: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     argument_graph: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     unknown_unknowns: Mapped[list | None] = mapped_column(ARRAY(Text), nullable=True)
+    # {conclusion, trajectory, exchanges} — what the rounds add up to, beyond the number.
+    synthesis: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

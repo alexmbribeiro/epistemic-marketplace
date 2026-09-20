@@ -92,6 +92,7 @@ async def _run_debate_background(debate_id: str, claim_id: str, claim_content: s
             debate.final_belief_distribution = result["final_belief_distribution"]
             debate.argument_graph = result["argument_graph"]
             debate.unknown_unknowns = result["unknown_unknowns"]
+            debate.synthesis = result.get("synthesis")
             debate.completed_at = datetime.now(timezone.utc)
 
             # Persist agent positions from all rounds

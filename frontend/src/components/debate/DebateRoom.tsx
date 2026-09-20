@@ -10,6 +10,9 @@ import BeliefDistributionChart from "./BeliefDistribution";
 import ArgumentGraphViz from "./ArgumentGraph";
 import DebateTimeline from "./DebateTimeline";
 import UnknownUnknowns from "./UnknownUnknowns";
+import ConclusionPanel from "./Conclusion";
+import BeliefTrajectory from "./BeliefTrajectory";
+import Exchanges from "./Exchanges";
 import type { DebateEvent } from "@/types";
 
 interface Props {
@@ -17,7 +20,7 @@ interface Props {
 }
 
 export default function DebateRoom({ debateId }: Props) {
-  const { status, currentRound, positions, finalDistribution, argumentGraph, unknownUnknowns, setDebateId, handleEvent, reset } =
+  const { status, currentRound, positions, finalDistribution, argumentGraph, unknownUnknowns, synthesis, setDebateId, handleEvent, reset } =
     useDebateStore();
 
   const { data: debate } = useQuery({
@@ -33,16 +36,22 @@ export default function DebateRoom({ debateId }: Props) {
 
   useDebateWebSocket(debateId, (event: DebateEvent) => handleEvent(event));
 
-  const latestPositions = positions.round3.length
-    ? positions.round3
-    : positions.round2.length
-    ? positions.round2
-    : positions.round1;
+  // Live events fill the store; a completed debate opened fresh has an empty
+  // store, so fall back to the rounds persisted with the synthesis.
+  const stored = (synthesis || debate?.synthesis || null)?.positions;
+  const latestPositions =
+    positions.round3.length ? positions.round3
+    : positions.round2.length ? positions.round2
+    : positions.round1.length ? positions.round1
+    : stored?.round3?.length ? stored.round3
+    : stored?.round2?.length ? stored.round2
+    : stored?.round1 ?? [];
 
   const isCompleted = status === "completed" || debate?.status === "completed";
   const effectiveDistribution = finalDistribution || debate?.final_belief_distribution;
   const effectiveGraph = argumentGraph || debate?.argument_graph;
   const effectiveUnknowns = unknownUnknowns.length ? unknownUnknowns : debate?.unknown_unknowns || [];
+  const effectiveSynthesis = synthesis || debate?.synthesis || null;
 
   return (
     <div className="space-y-6">
@@ -54,12 +63,25 @@ export default function DebateRoom({ debateId }: Props) {
           }`}
         />
         <span className="text-sm text-slate-400 capitalize font-mono">
-          {isCompleted ? "completed" : status === "debating" ? `round ${currentRound} in progress` : status}
+          {isCompleted
+            ? "completed"
+            : status === "synthesising"
+            ? "writing conclusion"
+            : status === "debating"
+            ? `round ${currentRound} in progress`
+            : status}
         </span>
       </div>
 
       {/* Timeline */}
       <DebateTimeline currentRound={currentRound} status={isCompleted ? "completed" : status} />
+
+      {effectiveSynthesis?.conclusion && effectiveDistribution && (
+        <ConclusionPanel
+          conclusion={effectiveSynthesis.conclusion}
+          weightedMean={effectiveDistribution.weighted_mean}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Agent Cards */}
@@ -76,8 +98,8 @@ export default function DebateRoom({ debateId }: Props) {
           )}
         </div>
 
-        {/* Belief Distribution */}
-        <div className="space-y-3">
+        {/* Belief Distribution — sticks while the taller card column scrolls */}
+        <div className="space-y-3 lg:sticky lg:top-6 lg:self-start">
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Belief Distribution</h2>
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
             {effectiveDistribution ? (
@@ -90,6 +112,31 @@ export default function DebateRoom({ debateId }: Props) {
           </div>
         </div>
       </div>
+
+      {/* How belief moved */}
+      {effectiveSynthesis?.trajectory?.agents?.length ? (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+            How Belief Moved
+          </h2>
+          <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+            <BeliefTrajectory trajectory={effectiveSynthesis.trajectory} />
+          </div>
+        </div>
+      ) : null}
+
+      {/* The back-and-forth itself */}
+      {effectiveSynthesis?.exchanges?.length ? (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+            Exchanges
+            <span className="ml-2 text-slate-600 normal-case font-normal tracking-normal">
+              who challenged whom
+            </span>
+          </h2>
+          <Exchanges exchanges={effectiveSynthesis.exchanges} />
+        </div>
+      ) : null}
 
       {/* Argument Graph */}
       {effectiveGraph && effectiveGraph.nodes.length > 0 && (

@@ -2,28 +2,8 @@
 
 import type { AgentPosition, ArchetypeId } from "@/types";
 import { asText } from "@/lib/text";
+import { agentColor } from "@/lib/agentColors";
 
-const ARCHETYPE_COLORS: Record<ArchetypeId | string, string> = {
-  bayesian: "border-violet-500 bg-violet-950/30",
-  falsificationist: "border-rose-500 bg-rose-950/30",
-  analogist: "border-emerald-500 bg-emerald-950/30",
-  contrarian: "border-orange-500 bg-orange-950/30",
-  dialectician: "border-cyan-500 bg-cyan-950/30",
-  frequentist: "border-blue-500 bg-blue-950/30",
-  domain_expert: "border-yellow-500 bg-yellow-950/30",
-  custom: "border-slate-500 bg-slate-950/30",
-};
-
-const ARCHETYPE_BADGE: Record<ArchetypeId | string, string> = {
-  bayesian: "bg-violet-900 text-violet-200",
-  falsificationist: "bg-rose-900 text-rose-200",
-  analogist: "bg-emerald-900 text-emerald-200",
-  contrarian: "bg-orange-900 text-orange-200",
-  dialectician: "bg-cyan-900 text-cyan-200",
-  frequentist: "bg-blue-900 text-blue-200",
-  domain_expert: "bg-yellow-900 text-yellow-200",
-  custom: "bg-slate-900 text-slate-200",
-};
 
 function BeliefBar({ score }: { score: number }) {
   const pct = Math.round(score * 100);
@@ -44,15 +24,26 @@ interface AgentCardProps {
 }
 
 export default function AgentCard({ position, isLatest = true }: AgentCardProps) {
-  const borderCls = ARCHETYPE_COLORS[position.archetype] || ARCHETYPE_COLORS.custom;
-  const badgeCls = ARCHETYPE_BADGE[position.archetype] || ARCHETYPE_BADGE.custom;
+  // Same colour the agent carries in the trajectory chart and the exchanges,
+  // so identity reads the same everywhere.
+  const color = agentColor(position.archetype);
 
   return (
-    <div className={`rounded-xl border p-4 space-y-3 transition-all ${borderCls} ${isLatest ? "opacity-100" : "opacity-50"}`}>
+    <div
+      className={`rounded-xl border border-slate-800 border-l-4 bg-slate-900/40 p-4 space-y-3 transition-all ${
+        isLatest ? "opacity-100" : "opacity-50"
+      }`}
+      style={{ borderLeftColor: color }}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-white">{position.agent_name}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-mono ${badgeCls}`}>{position.archetype}</span>
+          <span
+            className="text-xs px-2 py-0.5 rounded-full font-mono text-slate-300 border"
+            style={{ borderColor: color }}
+          >
+            {position.archetype}
+          </span>
           <span className="text-xs text-slate-500">R{position.round_number}</span>
         </div>
         <span
