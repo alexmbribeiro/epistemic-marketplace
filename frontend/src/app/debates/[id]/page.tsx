@@ -24,7 +24,7 @@ export default function DebatePage({ params }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/debates" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
+        <Link href="/debates" className="text-sm text-white/40 hover:text-white/75 transition-colors">
           ← All debates
         </Link>
       </div>
@@ -32,9 +32,9 @@ export default function DebatePage({ params }: Props) {
       {claim && (
         <div className="rounded-xl border border-indigo-900/50 bg-indigo-950/20 p-5">
           <p className="text-xs text-indigo-400 font-semibold uppercase tracking-wider mb-2">Claim</p>
-          <p className="text-lg text-slate-100 font-medium">"{claim.content}"</p>
+          <p className="text-lg text-white/90 font-medium">"{claim.content}"</p>
           <div className="flex gap-3 mt-2">
-            <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{claim.category}</span>
+            <span className="text-xs text-white/40 bg-white/[0.07] px-2 py-0.5 rounded-full">{claim.category}</span>
             {claim.is_verifiable && (
               <span className="text-xs text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full">verifiable</span>
             )}

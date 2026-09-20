@@ -70,7 +70,7 @@ export default function DebateRoom({ debateId }: Props) {
             isCompleted ? "bg-emerald-500" : status === "failed" ? "bg-rose-500" : "bg-indigo-500 animate-pulse"
           }`}
         />
-        <span className="text-sm text-slate-400 capitalize font-mono">
+        <span className="text-sm text-white/55 capitalize font-mono">
           {isCompleted
             ? "completed"
             : status === "synthesising"
@@ -94,9 +94,9 @@ export default function DebateRoom({ debateId }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Agent Cards */}
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Agent Positions</h2>
+          <h2 className="text-sm font-semibold text-white/55 uppercase tracking-wider">Agent Positions</h2>
           {latestPositions.length === 0 ? (
-            <div className="rounded-xl border border-slate-800 p-8 text-center text-slate-600">
+            <div className="glass p-10 text-center text-white/30">
               Waiting for agents to form positions...
             </div>
           ) : (
@@ -108,12 +108,12 @@ export default function DebateRoom({ debateId }: Props) {
 
         {/* Belief Distribution — sticks while the taller card column scrolls */}
         <div className="space-y-3 lg:sticky lg:top-6 lg:self-start">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Belief Distribution</h2>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+          <h2 className="text-sm font-semibold text-white/55 uppercase tracking-wider">Belief Distribution</h2>
+          <div className="glass p-5">
             {effectiveDistribution ? (
               <BeliefDistributionChart distribution={effectiveDistribution} />
             ) : (
-              <div className="h-48 flex items-center justify-center text-slate-600 text-sm">
+              <div className="h-48 flex items-center justify-center text-white/28 text-sm">
                 Distribution available after debate completes
               </div>
             )}
@@ -124,10 +124,10 @@ export default function DebateRoom({ debateId }: Props) {
       {/* How belief moved */}
       {effectiveSynthesis?.trajectory?.agents?.length ? (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+          <h2 className="text-sm font-semibold text-white/55 uppercase tracking-wider">
             How Belief Moved
           </h2>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+          <div className="glass p-5">
             <BeliefTrajectory trajectory={effectiveSynthesis.trajectory} palette={palette} />
           </div>
         </div>
@@ -136,9 +136,9 @@ export default function DebateRoom({ debateId }: Props) {
       {/* The back-and-forth itself */}
       {effectiveSynthesis?.exchanges?.length ? (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+          <h2 className="text-sm font-semibold text-white/55 uppercase tracking-wider">
             Exchanges
-            <span className="ml-2 text-slate-600 normal-case font-normal tracking-normal">
+            <span className="ml-2 text-white/28 normal-case font-normal tracking-normal">
               who challenged whom
             </span>
           </h2>
@@ -149,8 +149,8 @@ export default function DebateRoom({ debateId }: Props) {
       {/* Argument Graph */}
       {effectiveGraph && effectiveGraph.nodes.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Argument Graph</h2>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+          <h2 className="text-sm font-semibold text-white/55 uppercase tracking-wider">Argument Graph</h2>
+          <div className="glass p-5">
             <ArgumentGraphViz graph={effectiveGraph} />
           </div>
         </div>

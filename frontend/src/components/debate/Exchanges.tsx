@@ -27,28 +27,28 @@ export default function Exchanges({ exchanges, palette }: Props) {
     <div className="space-y-5">
       {Object.entries(byRound).map(([round, items]) => (
         <div key={round} className="space-y-2">
-          <p className="text-xs text-slate-500 font-mono">Round {round}</p>
+          <p className="text-xs text-white/40 font-mono">Round {round}</p>
           {items.map((e, i) => (
-            <div key={i} className="rounded-lg border border-slate-800 bg-slate-900/40 p-3 space-y-1.5">
+            <div key={i} className="glass-sm p-4 space-y-2">
               <div className="flex items-center gap-2 text-xs flex-wrap">
                 <span className="flex items-center gap-1.5">
                   <span
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ background: colorFrom(palette, e.from_archetype) }}
                   />
-                  <span className="text-slate-300 font-medium">{asText(e.from_agent)}</span>
+                  <span className="text-white/75 font-medium">{asText(e.from_agent)}</span>
                 </span>
-                <span className="text-slate-600">→</span>
-                <span className="text-slate-400 capitalize">{asText(e.to_agent)}</span>
+                <span className="text-white/28">→</span>
+                <span className="text-white/55 capitalize">{asText(e.to_agent)}</span>
                 <span
                   className={`ml-auto text-[10px] border rounded px-1.5 py-0.5 ${
-                    TYPE_STYLE[e.type] ?? "text-slate-400 border-slate-600"
+                    TYPE_STYLE[e.type] ?? "text-white/55 border-white/20"
                   }`}
                 >
                   {e.type}
                 </span>
               </div>
-              <p className="text-sm text-slate-300/90 leading-relaxed">{asText(e.text)}</p>
+              <p className="text-sm text-white/75/90 leading-relaxed">{asText(e.text)}</p>
             </div>
           ))}
         </div>

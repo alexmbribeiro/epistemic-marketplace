@@ -14,7 +14,7 @@ export default function UnknownUnknowns({ questions }: Props) {
       <div className="flex items-center gap-2">
         <span className="text-rose-400 text-lg">?</span>
         <h3 className="text-sm font-semibold text-rose-300">Unknown Unknowns</h3>
-        <span className="text-xs text-slate-500 ml-auto">Questions no agent could answer</span>
+        <span className="text-xs text-white/40 ml-auto">Questions no agent could answer</span>
       </div>
       <ul className="space-y-2">
         {questions.map((q, i) => (

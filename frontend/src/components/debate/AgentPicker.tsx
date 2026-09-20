@@ -5,14 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { agentsApi } from "@/lib/api";
 import { MAX_SERIES, paletteFor } from "@/lib/agentColors";
 
-/** The six seeded archetypes. Anything else is opt-in. */
+/** Mirrors DEFAULT_ARCHETYPES on the backend: five debating leaves three to judge. */
 const DEFAULT_ARCHETYPES = [
-  "bayesian",
-  "falsificationist",
-  "analogist",
-  "contrarian",
-  "dialectician",
-  "frequentist",
+  "nietzschean",
+  "humean",
+  "kantian",
+  "aristotelian",
+  "jungian",
 ];
 
 interface Props {
@@ -37,7 +36,7 @@ export default function AgentPicker({ selected, onChange }: Props) {
   }, [agents, onChange]);
 
   if (isLoading) {
-    return <p className="text-xs text-slate-600">Loading agents…</p>;
+    return <p className="text-xs text-white/28">Loading agents…</p>;
   }
   if (!agents?.length) {
     return <p className="text-xs text-rose-400">No agents available.</p>;
@@ -61,8 +60,8 @@ export default function AgentPicker({ selected, onChange }: Props) {
   return (
     <div className="space-y-2">
       <div className="flex items-baseline gap-2">
-        <label className="text-xs text-slate-500">Agents in this debate</label>
-        <span className="text-xs text-slate-600">
+        <label className="text-xs text-white/40">Agents in this debate</label>
+        <span className="text-xs text-white/28">
           {selected.length} selected
           {selected.length < 2
             ? " — pick at least two"
@@ -77,7 +76,7 @@ export default function AgentPicker({ selected, onChange }: Props) {
           }
           className="ml-auto text-xs text-indigo-400 hover:text-indigo-300"
         >
-          Reset to default six
+          Reset to default five
         </button>
       </div>
 
@@ -92,10 +91,10 @@ export default function AgentPicker({ selected, onChange }: Props) {
               onClick={() => toggle(a.id)}
               title={a.description}
               aria-pressed={on}
-              className={`flex items-center gap-2 text-xs rounded-full border px-3 py-1.5 transition-colors ${
+              className={`flex items-center gap-2 text-[13px] pill border px-3.5 py-2 transition-all ${
                 on
-                  ? "border-slate-500 bg-slate-800 text-slate-100"
-                  : "border-slate-800 bg-transparent text-slate-500 hover:border-slate-700"
+                  ? "border-white/25 bg-white/[0.09] text-white/90"
+                  : "border-white/[0.08] bg-transparent text-white/40 hover:border-white/15"
               }`}
             >
               <span

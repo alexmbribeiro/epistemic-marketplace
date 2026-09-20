@@ -9,8 +9,8 @@ const EDGE_COLORS: Record<string, string> = {
   contradicts: "#f43f5e",
   qualifies: "#f59e0b",
   redefines: "#a78bfa",
-  updates: "#64748b",
-  uncertain: "#94a3b8",
+  updates: "rgba(255,255,255,0.28)",
+  uncertain: "rgba(255,255,255,0.45)",
 };
 
 interface Props {
@@ -57,7 +57,7 @@ export default function ArgumentGraphViz({ graph }: Props) {
       .selectAll("line")
       .data(graph.edges)
       .join("line")
-      .attr("stroke", (d) => EDGE_COLORS[d.type] || "#64748b")
+      .attr("stroke", (d) => EDGE_COLORS[d.type] || "rgba(255,255,255,0.28)")
       .attr("stroke-width", (d) => Math.max(1, d.strength * 3))
       .attr("stroke-opacity", 0.7)
       .attr("marker-end", (d) => `url(#arrow-${d.type})`);
@@ -79,10 +79,10 @@ export default function ArgumentGraphViz({ graph }: Props) {
       .attr("r", (d: any) => (d.type === "claim" ? 18 : 14))
       .attr("fill", (d: any) => {
         if (d.type === "claim") return "#6366f1";
-        if (d.belief_score === undefined) return "#334155";
+        if (d.belief_score === undefined) return "rgba(255,255,255,0.12)";
         return d.belief_score > 0.6 ? "#0e7490" : d.belief_score < 0.4 ? "#be123c" : "#92400e";
       })
-      .attr("stroke", "#1e293b")
+      .attr("stroke", "#05070b")
       .attr("stroke-width", 2);
 
     node
@@ -113,11 +113,11 @@ export default function ArgumentGraphViz({ graph }: Props) {
         {Object.entries(EDGE_COLORS).map(([type, color]) => (
           <div key={type} className="flex items-center gap-1">
             <div className="w-4 h-0.5 rounded" style={{ backgroundColor: color }} />
-            <span className="text-slate-400">{type}</span>
+            <span className="text-white/55">{type}</span>
           </div>
         ))}
       </div>
-      <svg ref={svgRef} className="w-full rounded-lg bg-slate-900/50" height={400} />
+      <svg ref={svgRef} className="w-full rounded-lg bg-white/[0.03]" height={400} />
     </div>
   );
 }

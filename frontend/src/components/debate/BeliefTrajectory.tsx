@@ -32,16 +32,16 @@ function Tip({ active, payload, label }: { active?: boolean; payload?: TipPayloa
   const phase = ROUND_PHASES[idx];
   const rows = [...payload].sort((a, b) => b.value - a.value);
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 shadow-xl">
-      <p className="text-xs text-slate-400 mb-1.5">
+    <div className="glass-sm px-3.5 py-2.5">
+      <p className="text-xs text-white/55 mb-1.5">
         {label}
-        {phase ? <span className="text-slate-500"> · {phase}</span> : null}
+        {phase ? <span className="text-white/40"> · {phase}</span> : null}
       </p>
       {rows.map((r) => (
         <div key={r.name} className="flex items-center gap-2 text-xs">
           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: r.color }} />
-          <span className="text-slate-300">{r.name}</span>
-          <span className="ml-auto font-mono text-slate-100">{Math.round(r.value * 100)}%</span>
+          <span className="text-white/75">{r.name}</span>
+          <span className="ml-auto font-mono text-white/90">{Math.round(r.value * 100)}%</span>
         </div>
       ))}
     </div>
@@ -75,9 +75,9 @@ export default function BeliefTrajectory({ trajectory, palette }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-baseline gap-2 flex-wrap">
-        <span className="text-sm text-slate-300">{convergenceCopy}</span>
+        <span className="text-sm text-white/75">{convergenceCopy}</span>
         {spread.length >= 2 && (
-          <span className="text-xs text-slate-500 font-mono">
+          <span className="text-xs text-white/40 font-mono">
             spread {Math.round(spread[0] * 100)}% → {Math.round(spread[spread.length - 1] * 100)}%
           </span>
         )}
@@ -90,11 +90,11 @@ export default function BeliefTrajectory({ trajectory, palette }: Props) {
 
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: -16 }}>
-          <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid stroke="rgba(255,255,255,0.07)" strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="round"
-            tick={{ fontSize: 11, fill: "#64748b" }}
-            axisLine={{ stroke: "#1e293b" }}
+            tick={{ fontSize: 11, fill: "rgba(255,255,255,0.38)" }}
+            axisLine={{ stroke: "rgba(255,255,255,0.07)" }}
             tickLine={false}
             interval={0}
           />
@@ -102,15 +102,15 @@ export default function BeliefTrajectory({ trajectory, palette }: Props) {
             domain={[0, 1]}
             ticks={[0, 0.25, 0.5, 0.75, 1]}
             tickFormatter={(v: number) => `${Math.round(v * 100)}%`}
-            tick={{ fontSize: 11, fill: "#64748b" }}
+            tick={{ fontSize: 11, fill: "rgba(255,255,255,0.38)" }}
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={<Tip />} cursor={{ stroke: "#334155", strokeWidth: 1 }} />
+          <Tooltip content={<Tip />} cursor={{ stroke: "rgba(255,255,255,0.18)", strokeWidth: 1 }} />
           <Legend
             wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
             iconType="plainline"
-            formatter={(value: string) => <span className="text-slate-400">{value}</span>}
+            formatter={(value: string) => <span className="text-white/55">{value}</span>}
           />
           {agents.map((a) => (
             <Line
@@ -131,7 +131,7 @@ export default function BeliefTrajectory({ trajectory, palette }: Props) {
       {/* Table view — also the "who moved" readout */}
       <table className="w-full text-xs">
         <thead>
-          <tr className="text-slate-500 text-left">
+          <tr className="text-white/40 text-left">
             <th className="font-normal pb-1">Agent</th>
             {Array.from({ length: rounds }, (_, i) => (
               <th key={i} className="font-normal pb-1 text-right">R{i + 1}</th>
@@ -143,14 +143,14 @@ export default function BeliefTrajectory({ trajectory, palette }: Props) {
           {[...agents]
             .sort((a, b) => (b.swing ?? 0) - (a.swing ?? 0))
             .map((a) => (
-              <tr key={a.agent_id} className="border-t border-slate-800/70">
+              <tr key={a.agent_id} className="border-t border-white/[0.06]">
                 <td className="py-1.5">
                   <span className="flex items-center gap-2">
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
                       style={{ background: colorFrom(palette, a.archetype) }}
                     />
-                    <span className="text-slate-300">{a.agent_name}</span>
+                    <span className="text-white/75">{a.agent_name}</span>
                     {a.reversed && (
                       <span className="text-[10px] text-amber-300/90 border border-amber-500/40 rounded px-1">
                         reversed
@@ -159,11 +159,11 @@ export default function BeliefTrajectory({ trajectory, palette }: Props) {
                   </span>
                 </td>
                 {a.beliefs.map((b, i) => (
-                  <td key={i} className="py-1.5 text-right font-mono text-slate-400">
+                  <td key={i} className="py-1.5 text-right font-mono text-white/55">
                     {Math.round(b * 100)}%
                   </td>
                 ))}
-                <td className="py-1.5 text-right font-mono text-slate-300">
+                <td className="py-1.5 text-right font-mono text-white/75">
                   {a.swing == null
                     ? "—"
                     : a.swing === 0

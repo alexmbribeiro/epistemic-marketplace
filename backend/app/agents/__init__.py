@@ -3,11 +3,15 @@ from app.agents.aristotle import AristotelianAgent
 from app.agents.base_agent import AgentResult, BaseAgent
 from app.agents.dostoevsky import DostoevskianAgent
 from app.agents.hume import HumeanAgent
+from app.agents.kierkegaard import KierkegaardianAgent
 from app.agents.jung import JungianAgent
 from app.agents.kant import KantianAgent
+from app.agents.marx import MarxistAgent
+from app.agents.nagarjuna import MadhyamakaAgent
 from app.agents.nietzsche import NietzscheanAgent
 from app.agents.pragmatist import PragmatistAgent
 from app.agents.spinoza import SpinozistAgent
+from app.agents.weil import WeilianAgent
 from app.agents.wittgenstein import WittgensteinianAgent
 
 # Each is here for a test none of the others makes: genealogy, symbolic
@@ -25,6 +29,10 @@ ARCHETYPE_MAP = {
     "adlerian": AdlerianAgent,
     "spinozist": SpinozistAgent,
     "dostoevskian": DostoevskianAgent,
+    "madhyamaka": MadhyamakaAgent,
+    "weilian": WeilianAgent,
+    "marxist": MarxistAgent,
+    "kierkegaardian": KierkegaardianAgent,
 }
 
 SEEDED_ARCHETYPES = list(ARCHETYPE_MAP)
