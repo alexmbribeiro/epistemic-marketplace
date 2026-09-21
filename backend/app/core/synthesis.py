@@ -8,7 +8,7 @@ the agents ended up closer together or further apart.
 import statistics
 
 from app.agents.base_agent import AgentResult
-from app.core.argument_graph import resolve_agent
+from app.core.naming import resolve_agent
 
 
 def build_trajectory(all_rounds: list[list[AgentResult]]) -> dict:

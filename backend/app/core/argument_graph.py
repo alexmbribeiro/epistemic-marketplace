@@ -1,39 +1,7 @@
-import re
 import uuid
 
 from app.agents.base_agent import AgentResult
-
-
-def _key(text: str) -> str:
-    return re.sub(r"[^a-z]", "", (text or "").lower())
-
-
-def resolve_agent(name: str, candidates) -> object | None:
-    """Match a name the model wrote against an actual agent.
-
-    Agents get named in whichever form the model reaches for: "Wittgenstein",
-    "wittgensteinian", "the Kantian". The original matcher asked whether the
-    written name appeared inside the node label, which fails for every
-    adjectival form — "wittgensteinian" is not a substring of "wittgenstein",
-    it is longer — so nearly every challenge edge was silently dropped and the
-    graph showed a debate in which nobody answered anybody.
-    """
-    want = _key(name)
-    if not want:
-        return None
-    fallback = None
-    for c in candidates:
-        label = _key(getattr(c, "agent_name", None) or c.get("label", "").split(" (")[0])
-        arche = _key(getattr(c, "archetype", None) or c.get("archetype", ""))
-        if want in (label, arche):
-            return c
-        # Containment both ways, so "wittgensteinian" finds Wittgenstein and
-        # "the marxist" finds the marxist. Four characters minimum: shorter
-        # fragments start matching things they should not.
-        for form in (label, arche):
-            if len(form) >= 4 and (form in want or want in form):
-                fallback = fallback or c
-    return fallback
+from app.core.naming import resolve_agent
 
 
 def build_argument_graph(all_rounds: list[list[AgentResult]]) -> dict:

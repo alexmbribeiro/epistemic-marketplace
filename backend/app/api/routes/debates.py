@@ -98,6 +98,14 @@ async def create_debate(
     claim.status = "debating"
     await db.commit()
 
+    # Re-read with the claim attached: the response exposes claim_content,
+    # and a lazy relationship load inside an async session raises.
+    debate = (
+        await db.execute(
+            select(Debate).options(selectinload(Debate.claim)).where(Debate.id == debate.id)
+        )
+    ).scalar_one()
+
     # Run debate in background
     asyncio.create_task(
         _run_debate_background(str(debate.id), str(claim.id), claim.content, agent_db_records, jury_records)

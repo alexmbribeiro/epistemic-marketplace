@@ -1,6 +1,7 @@
 import uuid
 from dataclasses import dataclass, field
 
+from app.core.naming import resolve_agent
 from app.services import llm_service
 
 
@@ -75,10 +76,18 @@ Evaluate this claim independently. Do not assume consensus. Apply your cognitive
         )
 
     async def challenge(self, claim: str, others: list[AgentResult]) -> AgentResult:
-        others_summary = "\n".join(
-            f"- {r.agent_name} ({r.archetype}): belief={r.belief_score:.2f}, argument={r.argument_content}"
-            for r in others if r.agent_id != self.agent_id
-        )
+        def describe(r: AgentResult) -> str:
+            # Cruxes included on purpose: without them an agent can only argue
+            # against a headline, never against what would actually move the
+            # other's mind.
+            cruxes = "; ".join(r.cruxes[:2]) if r.cruxes else "none stated"
+            return (
+                f"- {r.agent_name} ({r.archetype}): belief={r.belief_score:.2f}\n"
+                f"    argument: {r.argument_content}\n"
+                f"    would change their mind: {cruxes}"
+            )
+
+        others_summary = "\n".join(describe(r) for r in others if r.agent_id != self.agent_id)
         prompt = f"""CLAIM: "{claim}"
 
 Other agents have formed their initial positions:
@@ -100,6 +109,22 @@ Now review these positions and form your updated position. Challenge positions y
             **{k: result[k] for k in result if k != "challenges"},
         )
 
+    def _challenges_against(self, round2: list[AgentResult]) -> list[tuple[str, dict]]:
+        """The challenges other agents aimed at this one.
+
+        Targets are written by the model in whatever form it likes, so they
+        have to be resolved rather than compared.
+        """
+        me = [{"label": self.name, "archetype": self.archetype}]
+        aimed = []
+        for r in round2:
+            if r.agent_id == self.agent_id:
+                continue
+            for ch in r.challenges or []:
+                if resolve_agent(ch.get("target_agent", ""), me) is not None:
+                    aimed.append((r.agent_name, ch))
+        return aimed
+
     async def synthesize(self, claim: str, round1: list[AgentResult], round2: list[AgentResult]) -> AgentResult:
         r1_summary = "\n".join(
             f"- {r.agent_name}: belief={r.belief_score:.2f} | {r.argument_content}"
@@ -109,13 +134,30 @@ Now review these positions and form your updated position. Challenge positions y
             f"- {r.agent_name}: belief={r.belief_score:.2f} | {r.argument_content}"
             for r in round2 if r.agent_id != self.agent_id
         )
+        # Challenges used to be produced, stored, drawn as arrows — and never
+        # delivered to the agent they were aimed at, which left every agent
+        # synthesising against headlines it had already seen.
+        aimed = self._challenges_against(round2)
+        if aimed:
+            addressed = "\n".join(
+                f"- {who} ({ch.get('type', 'contradicts')}): {ch.get('challenge', '')}"
+                for who, ch in aimed
+            )
+            challenge_block = (
+                f"\n\nCHALLENGES ADDRESSED TO YOU:\n{addressed}\n\n"
+                "Answer these directly. Say which land and which do not, and why. "
+                "Conceding a good challenge is not a loss; ignoring one is."
+            )
+        else:
+            challenge_block = "\n\nNobody challenged you directly this round."
+
         prompt = f"""CLAIM: "{claim}"
 
 ROUND 1 — Initial positions:
 {r1_summary}
 
-ROUND 2 — Cross-challenges:
-{r2_summary}
+ROUND 2 — Updated positions:
+{r2_summary}{challenge_block}
 
 Now synthesize. Has your view changed? Why or why not? Provide your final position."""
 
