@@ -17,7 +17,12 @@ def compute_belief_distribution(positions: list[AgentResult]) -> dict:
     if not positions:
         return {"mean": 0.5, "std": 0.0, "buckets": [], "dominant_agents": []}
 
-    beliefs = [pos.belief_score for pos in positions]
+    # probability_true, not belief_score: each agent's own verdict measures
+    # something different by design — Dostoevsky scores whether a claim can be
+    # lived, Hume scores expectation from experience — so averaging those
+    # would add quantities that are not the same quantity. The common scale is
+    # the only one that can be summed.
+    beliefs = [pos.probability_true for pos in positions]
     mean = sum(beliefs) / len(beliefs)
     variance = sum((b - mean) ** 2 for b in beliefs) / len(beliefs)
     std = math.sqrt(variance)
@@ -31,8 +36,8 @@ def compute_belief_distribution(positions: list[AgentResult]) -> dict:
     buckets = [{"range": label, "count": count, "pct": count / len(beliefs)} for label, count in zip(bucket_labels, bucket_counts)]
 
     # The agents furthest from the fence — the ones actually driving the spread.
-    scored = sorted(positions, key=lambda p: abs(p.belief_score - 0.5), reverse=True)
-    dominant = [{"agent_name": p.agent_name, "belief_score": p.belief_score} for p in scored[:3]]
+    scored = sorted(positions, key=lambda p: abs(p.probability_true - 0.5), reverse=True)
+    dominant = [{"agent_name": p.agent_name, "belief_score": p.probability_true} for p in scored[:3]]
 
     # Identify zone of disagreement
     zone = _identify_disagreement_zone(positions)

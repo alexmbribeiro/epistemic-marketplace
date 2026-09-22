@@ -46,6 +46,7 @@ class AgentPosition(Base):
     round_number: Mapped[int] = mapped_column(Integer, nullable=False)
     agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cognitive_agents.id"), nullable=False)
     belief_score: Mapped[float] = mapped_column(Float, nullable=False)
+    probability_true: Mapped[float] = mapped_column(Float, nullable=False, server_default='0.5')
     confidence_low: Mapped[float] = mapped_column(Float, nullable=False)
     confidence_high: Mapped[float] = mapped_column(Float, nullable=False)
     reasoning: Mapped[str] = mapped_column(Text, nullable=False)

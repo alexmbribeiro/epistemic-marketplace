@@ -12,6 +12,7 @@ class AgentResult:
     archetype: str
     round_number: int
     belief_score: float
+    probability_true: float
     confidence_low: float
     confidence_high: float
     reasoning: str
@@ -82,7 +83,7 @@ Evaluate this claim independently. Do not assume consensus. Apply your cognitive
             # other's mind.
             cruxes = "; ".join(r.cruxes[:2]) if r.cruxes else "none stated"
             return (
-                f"- {r.agent_name} ({r.archetype}): belief={r.belief_score:.2f}\n"
+                f"- {r.agent_name} ({r.archetype}): P(true)={r.probability_true:.2f}, own verdict={r.belief_score:.2f}\n"
                 f"    argument: {r.argument_content}\n"
                 f"    would change their mind: {cruxes}"
             )
@@ -127,11 +128,11 @@ Now review these positions and form your updated position. Challenge positions y
 
     async def synthesize(self, claim: str, round1: list[AgentResult], round2: list[AgentResult]) -> AgentResult:
         r1_summary = "\n".join(
-            f"- {r.agent_name}: belief={r.belief_score:.2f} | {r.argument_content}"
+            f"- {r.agent_name}: P(true)={r.probability_true:.2f} | {r.argument_content}"
             for r in round1
         )
         r2_summary = "\n".join(
-            f"- {r.agent_name}: belief={r.belief_score:.2f} | {r.argument_content}"
+            f"- {r.agent_name}: P(true)={r.probability_true:.2f} | {r.argument_content}"
             for r in round2 if r.agent_id != self.agent_id
         )
         # Challenges used to be produced, stored, drawn as arrows — and never

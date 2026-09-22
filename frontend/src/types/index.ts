@@ -51,7 +51,11 @@ export interface AgentPosition {
   agent_name: string;
   archetype: ArchetypeId;
   round_number: number;
+  /** The agent's own verdict, in whatever its method measures. */
   belief_score: number;
+  /** Probability the claim is literally true, on the scale every agent shares.
+   *  This is the one that gets averaged, charted and compared. */
+  probability_true: number;
   confidence_low: number;
   confidence_high: number;
   reasoning: string;

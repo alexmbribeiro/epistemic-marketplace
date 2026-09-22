@@ -26,7 +26,9 @@ def build_trajectory(all_rounds: list[list[AgentResult]]) -> dict:
                     "beliefs": [],
                 },
             )
-            entry["beliefs"].append(round(pos.belief_score, 4))
+            # Common scale, matching the distribution — a trajectory drawn on
+            # each agent's own measure would not be comparable between rows.
+            entry["beliefs"].append(round(pos.probability_true, 4))
 
     agents = list(by_agent.values())
     for a in agents:
@@ -49,7 +51,7 @@ def build_trajectory(all_rounds: list[list[AgentResult]]) -> dict:
     # Spread per round: falling means the debate pulled agents together.
     spread = []
     for positions in all_rounds:
-        scores = [p.belief_score for p in positions]
+        scores = [p.probability_true for p in positions]
         spread.append(round(statistics.pstdev(scores), 4) if len(scores) > 1 else 0.0)
 
     converged = None

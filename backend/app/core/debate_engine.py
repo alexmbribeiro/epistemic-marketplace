@@ -39,6 +39,7 @@ def _result_to_dict(result: AgentResult) -> dict:
         "archetype": result.archetype,
         "round_number": result.round_number,
         "belief_score": result.belief_score,
+        "probability_true": result.probability_true,
         "confidence_low": result.confidence_low,
         "confidence_high": result.confidence_high,
         "reasoning": result.reasoning,

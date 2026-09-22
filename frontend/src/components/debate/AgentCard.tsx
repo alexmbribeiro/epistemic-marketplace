@@ -5,15 +5,30 @@ import { asText } from "@/lib/text";
 import { colorFrom } from "@/lib/agentColors";
 
 
-function BeliefBar({ score }: { score: number }) {
-  const pct = Math.round(score * 100);
-  const color = score > 0.6 ? "bg-cyan-400" : score < 0.4 ? "bg-rose-400" : "bg-amber-400";
+function BeliefBar({ probability, verdict }: { probability: number; verdict: number }) {
+  const pct = Math.round(probability * 100);
+  const own = Math.round(verdict * 100);
+  // The two measure different things on purpose: probability is the shared
+  // scale, the verdict is whatever this agent's method actually weighs. Shown
+  // apart only when they part company, so the card stays quiet when they agree.
+  const diverges = Math.abs(pct - own) >= 10;
+  const color = probability > 0.6 ? "bg-[#3987e5]" : probability < 0.4 ? "bg-[#e66767]" : "bg-white/35";
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
+        </div>
+        <span className="text-sm font-mono font-bold w-10 text-right">{pct}%</span>
       </div>
-      <span className="text-sm font-mono font-bold w-10 text-right">{pct}%</span>
+      <div className="flex items-baseline gap-2 text-[11px]">
+        <span className="text-white/30">probability the claim is true</span>
+        {diverges && (
+          <span className="ml-auto text-white/45">
+            own verdict <span className="font-mono text-white/70">{own}%</span>
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -61,7 +76,7 @@ export default function AgentCard({ position, isLatest = true, palette }: AgentC
         </span>
       </div>
 
-      <BeliefBar score={position.belief_score} />
+      <BeliefBar probability={position.probability_true} verdict={position.belief_score} />
 
       <p className="text-sm text-white/75 italic">"{position.argument_content}"</p>
 

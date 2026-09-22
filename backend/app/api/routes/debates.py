@@ -156,6 +156,7 @@ async def _run_debate_background(
                         round_number=pos["round_number"],
                         agent_id=uuid.UUID(pos["agent_id"]),
                         belief_score=pos["belief_score"],
+                        probability_true=pos.get("probability_true", 0.5),
                         confidence_low=pos["confidence_low"],
                         confidence_high=pos["confidence_high"],
                         reasoning=pos["reasoning"],

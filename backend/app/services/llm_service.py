@@ -25,13 +25,25 @@ def is_retryable(exc: Exception) -> bool:
     """
     if getattr(exc, "status_code", None) in _RETRYABLE_CODES:
         return True
-    if isinstance(exc, (asyncio.TimeoutError, IncompleteOutput, NoToolCall)):
+    if isinstance(exc, (asyncio.TimeoutError, IncompleteOutput, NoToolCall, Inconsistent)):
         return True
     text = str(exc).lower()
     return any(
         marker in text
         for marker in ("quota", "rate limit", "resource_exhausted", "1011 (internal error)")
     )
+
+
+class Inconsistent(Exception):
+    """argument_type and probability_true disagree.
+
+    Deliberately re-asked rather than repaired. When the two conflict, only
+    the argument text says which one slipped, and it is not parseable — a
+    real case had belief 0.1 labelled "supports" (number right, label wrong)
+    and, the next round, belief 1.0 labelled "contradicts" (label right,
+    number wrong). Deriving either field from the other would have been
+    correct once and wrong once.
+    """
 
 
 class NoToolCall(Exception):
@@ -108,11 +120,24 @@ def _coerce(payload: dict, schema: dict) -> dict:
     return out
 
 
+def _check_consistent(payload: dict) -> None:
+    kind, p = payload.get("argument_type"), payload.get("probability_true")
+    if kind not in ("supports", "contradicts") or not isinstance(p, (int, float)):
+        return
+    # A margin, so a genuine 0.5-ish position is not chased over a rounding.
+    if kind == "supports" and p < 0.45:
+        raise Inconsistent(f"argument_type 'supports' with probability_true {p}")
+    if kind == "contradicts" and p > 0.55:
+        raise Inconsistent(f"argument_type 'contradicts' with probability_true {p}")
+
+
 def _validate(payload: dict, schema: dict) -> dict:
     missing = sorted(set(schema.get("required", [])) - set(payload))
     if missing:
         raise IncompleteOutput(f"missing required fields: {', '.join(missing)}")
-    return _coerce(payload, schema)
+    coerced = _coerce(payload, schema)
+    _check_consistent(coerced)
+    return coerced
 
 # A debate fans out to six agents per round. Firing all six at a free-tier
 # per-minute limit gets most of them 429'd, and then they all back off in
@@ -140,54 +165,57 @@ def get_client() -> genai.Client:
 POSITION_SCHEMA = {
     "type": "object",
     "properties": {
-        "belief_score": {"type": "number", "description": "Probability claim is true, 0.0 to 1.0"},
+        "belief_score": {"type": "number", "description": "Your own verdict, 0.0 to 1.0, in whatever your method actually measures — your system prompt says what that is for you. It is NOT required to match probability_true, and where they differ that difference is the interesting part."},
+        "probability_true": {"type": "number", "description": "Probability the claim is LITERALLY TRUE, 0.0 to 1.0, on the plain everyday scale every agent shares. Give this even when your own method measures something else — this is the number that gets compared across agents, so it must mean the same thing coming from you as from anyone."},
         "confidence_low": {"type": "number", "description": "Lower bound of confidence interval"},
         "confidence_high": {"type": "number", "description": "Upper bound of confidence interval"},
         "reasoning": {"type": "string", "description": "Full reasoning chain"},
         "key_evidence": {"type": "array", "items": {"type": "string"}, "description": "Key evidence points"},
         "cruxes": {"type": "array", "items": {"type": "string"}, "description": "What would change your mind"},
-        "argument_type": {"type": "string", "enum": ["supports", "contradicts", "qualifies", "redefines", "uncertain"]},
+        "argument_type": {"type": "string", "enum": ["supports", "contradicts", "qualifies", "redefines", "uncertain"], "description": "How your argument stands to the claim. Must agree with probability_true: use 'supports' only above 0.5 and 'contradicts' only below it. Use 'qualifies', 'redefines' or 'uncertain' when neither fits."},
         "argument_content": {"type": "string", "description": "Core argument in one sentence"},
         "argument_strength": {"type": "number", "description": "Strength of this argument, 0.0 to 1.0"},
         "unanswered_questions": {"type": "array", "items": {"type": "string"}, "description": "Questions you cannot answer"},
     },
-    "required": ["belief_score", "confidence_low", "confidence_high", "reasoning", "key_evidence", "cruxes", "argument_type", "argument_content", "argument_strength", "unanswered_questions"],
+    "required": ["belief_score", "probability_true", "confidence_low", "confidence_high", "reasoning", "key_evidence", "cruxes", "argument_type", "argument_content", "argument_strength", "unanswered_questions"],
 }
 
 CHALLENGE_SCHEMA = {
     "type": "object",
     "properties": {
-        "belief_score": {"type": "number"},
+        "belief_score": {"type": "number", "description": "Your own verdict, 0.0 to 1.0, in whatever your method actually measures — your system prompt says what that is for you. It is NOT required to match probability_true, and where they differ that difference is the interesting part."},
+        "probability_true": {"type": "number", "description": "Probability the claim is LITERALLY TRUE, 0.0 to 1.0, on the plain everyday scale every agent shares. Give this even when your own method measures something else — this is the number that gets compared across agents, so it must mean the same thing coming from you as from anyone."},
         "confidence_low": {"type": "number"},
         "confidence_high": {"type": "number"},
         "reasoning": {"type": "string"},
         "key_evidence": {"type": "array", "items": {"type": "string"}},
         "cruxes": {"type": "array", "items": {"type": "string"}},
-        "argument_type": {"type": "string", "enum": ["supports", "contradicts", "qualifies", "redefines", "uncertain"]},
+        "argument_type": {"type": "string", "enum": ["supports", "contradicts", "qualifies", "redefines", "uncertain"], "description": "How your argument stands to the claim. Must agree with probability_true: use 'supports' only above 0.5 and 'contradicts' only below it. Use 'qualifies', 'redefines' or 'uncertain' when neither fits."},
         "argument_content": {"type": "string"},
         "argument_strength": {"type": "number"},
         "challenges": {"type": "array", "items": {"type": "object", "properties": {"target_agent": {"type": "string"}, "challenge": {"type": "string"}, "type": {"type": "string", "enum": ["contradicts", "qualifies", "redefines"]}}, "required": ["target_agent", "challenge", "type"]}},
         "unanswered_questions": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["belief_score", "confidence_low", "confidence_high", "reasoning", "key_evidence", "cruxes", "argument_type", "argument_content", "argument_strength", "challenges", "unanswered_questions"],
+    "required": ["belief_score", "probability_true", "confidence_low", "confidence_high", "reasoning", "key_evidence", "cruxes", "argument_type", "argument_content", "argument_strength", "challenges", "unanswered_questions"],
 }
 
 SYNTHESIS_SCHEMA = {
     "type": "object",
     "properties": {
-        "belief_score": {"type": "number"},
+        "belief_score": {"type": "number", "description": "Your own verdict, 0.0 to 1.0, in whatever your method actually measures — your system prompt says what that is for you. It is NOT required to match probability_true, and where they differ that difference is the interesting part."},
+        "probability_true": {"type": "number", "description": "Probability the claim is LITERALLY TRUE, 0.0 to 1.0, on the plain everyday scale every agent shares. Give this even when your own method measures something else — this is the number that gets compared across agents, so it must mean the same thing coming from you as from anyone."},
         "confidence_low": {"type": "number"},
         "confidence_high": {"type": "number"},
         "reasoning": {"type": "string"},
         "key_evidence": {"type": "array", "items": {"type": "string"}},
         "cruxes": {"type": "array", "items": {"type": "string"}},
-        "argument_type": {"type": "string", "enum": ["supports", "contradicts", "qualifies", "redefines", "uncertain"]},
+        "argument_type": {"type": "string", "enum": ["supports", "contradicts", "qualifies", "redefines", "uncertain"], "description": "How your argument stands to the claim. Must agree with probability_true: use 'supports' only above 0.5 and 'contradicts' only below it. Use 'qualifies', 'redefines' or 'uncertain' when neither fits."},
         "argument_content": {"type": "string"},
         "argument_strength": {"type": "number"},
         "synthesis_notes": {"type": "string", "description": "What changed from your initial position and why"},
         "unanswered_questions": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["belief_score", "confidence_low", "confidence_high", "reasoning", "key_evidence", "cruxes", "argument_type", "argument_content", "argument_strength", "synthesis_notes", "unanswered_questions"],
+    "required": ["belief_score", "probability_true", "confidence_low", "confidence_high", "reasoning", "key_evidence", "cruxes", "argument_type", "argument_content", "argument_strength", "synthesis_notes", "unanswered_questions"],
 }
 
 
@@ -241,7 +269,7 @@ RULES:
 async def synthesize_conclusion(claim: str, round3, distribution: dict, trajectory: dict) -> dict:
     """One extra call that turns the final positions into a readable verdict."""
     positions = "\n".join(
-        f"- {r.agent_name} ({r.archetype}): {r.belief_score:.2f} — {r.argument_content}"
+        f"- {r.agent_name} ({r.archetype}): P(true)={r.probability_true:.2f}, own verdict={r.belief_score:.2f} — {r.argument_content}"
         for r in round3
     )
     moves = "\n".join(
