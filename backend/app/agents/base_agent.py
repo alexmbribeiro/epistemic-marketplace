@@ -89,12 +89,29 @@ Evaluate this claim independently. Do not assume consensus. Apply your cognitive
             )
 
         others_summary = "\n".join(describe(r) for r in others if r.agent_id != self.agent_id)
+
+        # Every round is a fresh, stateless call — the agent remembers nothing
+        # it is not shown. Told to "form your updated position" without being
+        # shown the position, it re-derives from scratch and the number moves
+        # for no reason. Its own track is given explicitly, and kept apart from
+        # the others so it is not read as one more opinion in the room.
+        mine = next((r for r in others if r.agent_id == self.agent_id), None)
+        own_block = (
+            f"YOUR POSITION IN ROUND 1: P(true)={mine.probability_true:.2f}, "
+            f"own verdict={mine.belief_score:.2f}\n"
+            f"    {mine.argument_content}\n\n"
+            if mine
+            else ""
+        )
         prompt = f"""CLAIM: "{claim}"
 
-Other agents have formed their initial positions:
+{own_block}Other agents have formed their initial positions:
 {others_summary}
 
-Now review these positions and form your updated position. Challenge positions you disagree with. Specify which agent you are challenging and why."""
+Now form your position for this round, starting from where you stood rather than from \
+scratch. Challenge positions you disagree with, naming the agent and saying why. Move if \
+what you have read gives you reason to; hold if it does not. Either is fine — say which \
+you did."""
 
         result = await llm_service.run_agent_turn(
             self._build_system_prompt(),
@@ -130,7 +147,21 @@ Now review these positions and form your updated position. Challenge positions y
         r1_summary = "\n".join(
             f"- {r.agent_name}: P(true)={r.probability_true:.2f} | {r.argument_content}"
             for r in round1
+            if r.agent_id != self.agent_id
         )
+
+        # Round three used to show the agent its own round 1 but not its own
+        # round 2 — the older half of its history and not the newer — so a
+        # position that had moved in round 2 was pulled straight back to where
+        # round 1 left it. Both are given now, as one track.
+        r1_mine = next((r for r in round1 if r.agent_id == self.agent_id), None)
+        r2_mine = next((r for r in round2 if r.agent_id == self.agent_id), None)
+        track = []
+        if r1_mine:
+            track.append(f"  round 1: P(true)={r1_mine.probability_true:.2f} — {r1_mine.argument_content}")
+        if r2_mine:
+            track.append(f"  round 2: P(true)={r2_mine.probability_true:.2f} — {r2_mine.argument_content}")
+        own_track = ("YOUR OWN TRACK SO FAR:\n" + "\n".join(track) + "\n\n") if track else ""
         r2_summary = "\n".join(
             f"- {r.agent_name}: P(true)={r.probability_true:.2f} | {r.argument_content}"
             for r in round2 if r.agent_id != self.agent_id
@@ -154,13 +185,15 @@ Now review these positions and form your updated position. Challenge positions y
 
         prompt = f"""CLAIM: "{claim}"
 
-ROUND 1 — Initial positions:
+{own_track}ROUND 1 — Initial positions of the others:
 {r1_summary}
 
-ROUND 2 — Updated positions:
+ROUND 2 — Updated positions of the others:
 {r2_summary}{challenge_block}
 
-Now synthesize. Has your view changed? Why or why not? Provide your final position."""
+Now synthesize, starting from where your own track has been rather than from scratch. \
+State plainly whether your position moved across the three rounds, in which direction, \
+and what did or did not move it."""
 
         result = await llm_service.run_agent_turn(
             self._build_system_prompt(),
