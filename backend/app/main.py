@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import agents, auth, calibration, claims, debates
 from app.config import settings
 from app.database import engine
-from app.models import Base
 
 
 async def seed_system_agents():
@@ -40,8 +39,13 @@ async def seed_system_agents():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # The schema belongs to Alembic. create_all used to run here, and it only
+    # ever creates MISSING TABLES — it silently ignores a new column on a
+    # table that already exists, which is how five columns ended up being
+    # added by hand in psql with no record anywhere. Run `alembic upgrade
+    # head` before starting against a database that has not been migrated;
+    # the app will fail loudly on a missing table rather than quietly on a
+    # missing column.
     await seed_system_agents()
     yield
     await engine.dispose()
