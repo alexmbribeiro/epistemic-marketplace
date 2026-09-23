@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AgentPosition, AllPositions, BeliefDistribution, ArgumentGraph, DebateEvent } from "@/types";
+import type { AgentPosition, AllPositions, BeliefDistribution, ArgumentGraph, DebateEvent, Synthesis } from "@/types";
 
 interface DebateState {
   debateId: string | null;
@@ -9,6 +9,7 @@ interface DebateState {
   finalDistribution: BeliefDistribution | null;
   argumentGraph: ArgumentGraph | null;
   unknownUnknowns: string[];
+  synthesis: Synthesis | null;
   setDebateId: (id: string) => void;
   handleEvent: (event: DebateEvent) => void;
   reset: () => void;
@@ -24,6 +25,7 @@ export const useDebateStore = create<DebateState>((set) => ({
   finalDistribution: null,
   argumentGraph: null,
   unknownUnknowns: [],
+  synthesis: null,
 
   setDebateId: (id) => set({ debateId: id, status: "connecting" }),
 
@@ -31,6 +33,9 @@ export const useDebateStore = create<DebateState>((set) => ({
     switch (event.event) {
       case "debate_started":
         set({ status: "started" });
+        break;
+      case "synthesising":
+        set({ status: "synthesising" });
         break;
       case "round_started":
         set({ status: "debating", currentRound: (event.data as { round: number }).round });
@@ -55,12 +60,14 @@ export const useDebateStore = create<DebateState>((set) => ({
           final_belief_distribution: BeliefDistribution;
           argument_graph: ArgumentGraph;
           unknown_unknowns: string[];
+          synthesis: Synthesis | null;
         };
         set({
           status: "completed",
           finalDistribution: d.final_belief_distribution,
           argumentGraph: d.argument_graph,
           unknownUnknowns: d.unknown_unknowns,
+          synthesis: d.synthesis ?? null,
         });
         break;
       }
@@ -76,5 +83,6 @@ export const useDebateStore = create<DebateState>((set) => ({
       finalDistribution: null,
       argumentGraph: null,
       unknownUnknowns: [],
+      synthesis: null,
     }),
 }));

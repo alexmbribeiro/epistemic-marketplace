@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,7 +19,12 @@ class CognitiveAgent(Base):
     config: Mapped[dict] = mapped_column(JSONB, default=dict)
     creator_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)
-    reputation_score: Mapped[float] = mapped_column(Float, default=1.0)
+    # Peer rating from debates. Deliberately does not feed the belief
+    # aggregation: weighting the map of uncertainty by how well rival schools
+    # rate you would be a different claim than this number supports.
+    elo_rating: Mapped[float] = mapped_column(Float, default=1500.0)
+    debates_judged: Mapped[int] = mapped_column(Integer, default=0)
+    debates_rated_in: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     creator = relationship("User", back_populates="agents")

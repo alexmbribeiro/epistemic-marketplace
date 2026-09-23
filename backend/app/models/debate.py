@@ -18,10 +18,22 @@ class Debate(Base):
     final_belief_distribution: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     argument_graph: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     unknown_unknowns: Mapped[list | None] = mapped_column(ARRAY(Text), nullable=True)
+    # {conclusion, trajectory, exchanges} — what the rounds add up to, beyond the number.
+    synthesis: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     claim = relationship("Claim", back_populates="debates")
+
+    @property
+    def claim_content(self) -> str | None:
+        """Requires the claim to have been eager-loaded; a lazy load would
+        raise inside an async session."""
+        return self.claim.content if self.claim else None
+
+    @property
+    def claim_category(self) -> str | None:
+        return self.claim.category if self.claim else None
     positions = relationship("AgentPosition", back_populates="debate")
     arguments = relationship("Argument", back_populates="debate")
 
@@ -34,6 +46,7 @@ class AgentPosition(Base):
     round_number: Mapped[int] = mapped_column(Integer, nullable=False)
     agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cognitive_agents.id"), nullable=False)
     belief_score: Mapped[float] = mapped_column(Float, nullable=False)
+    probability_true: Mapped[float] = mapped_column(Float, nullable=False, server_default='0.5')
     confidence_low: Mapped[float] = mapped_column(Float, nullable=False)
     confidence_high: Mapped[float] = mapped_column(Float, nullable=False)
     reasoning: Mapped[str] = mapped_column(Text, nullable=False)
@@ -73,3 +86,25 @@ class CalibrationRecord(Base):
 
     claim = relationship("Claim", back_populates="calibration_records")
     agent = relationship("CognitiveAgent", back_populates="calibration_records")
+
+
+class JuryRating(Base):
+    """One judge's verdict on one participant of one debate.
+
+    Judges are drawn from philosophers who did not take part, so nobody rates
+    themselves. Scores are on craft, not agreement — see the judge prompt.
+    """
+
+    __tablename__ = "jury_ratings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    debate_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("debates.id"), nullable=False)
+    judge_agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cognitive_agents.id"), nullable=False)
+    subject_agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cognitive_agents.id"), nullable=False)
+    method_fidelity: Mapped[int] = mapped_column(Integer, nullable=False)
+    engagement: Mapped[int] = mapped_column(Integer, nullable=False)
+    crux_quality: Mapped[int] = mapped_column(Integer, nullable=False)
+    responsiveness: Mapped[int] = mapped_column(Integer, nullable=False)
+    overall: Mapped[float] = mapped_column(Float, nullable=False)
+    comment: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

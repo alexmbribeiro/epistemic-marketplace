@@ -42,3 +42,10 @@ Thumbs.db
 
 # ── coverage ─────────────────────────────────────────────────────────────────
 coverage/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Database snapshots — data, not code
+backups/
+.neon

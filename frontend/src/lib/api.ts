@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Claim, CognitiveAgent, Debate } from "@/types";
+import type { AgentStats, Claim, CognitiveAgent, Debate, FaultLines, JudgeBiasRow, LeaderboardEntry } from "@/types";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
@@ -25,13 +25,14 @@ export const debatesApi = {
   list: (limit = 20, offset = 0) =>
     api.get<Debate[]>("/debates/", { params: { limit, offset } }).then((r) => r.data),
   get: (id: string) => api.get<Debate>(`/debates/${id}`).then((r) => r.data),
-  create: (body: { claim_id: string; agent_archetypes?: string[] }) =>
+  create: (body: { claim_id: string; agent_ids?: string[]; agent_archetypes?: string[] }) =>
     api.post<Debate>("/debates/", body).then((r) => r.data),
 };
 
 export const agentsApi = {
   list: () => api.get<CognitiveAgent[]>("/agents/").then((r) => r.data),
   get: (id: string) => api.get<CognitiveAgent>(`/agents/${id}`).then((r) => r.data),
+  stats: (id: string) => api.get<AgentStats>(`/agents/${id}/stats`).then((r) => r.data),
   create: (body: {
     name: string;
     archetype: string;
@@ -43,10 +44,9 @@ export const agentsApi = {
 };
 
 export const calibrationApi = {
-  leaderboard: () =>
-    api.get<{ agent_id: string; name: string; archetype: string; reputation_score: number; description: string }[]>(
-      "/calibration/leaderboard"
-    ).then((r) => r.data),
+  leaderboard: () => api.get<LeaderboardEntry[]>("/calibration/leaderboard").then((r) => r.data),
+  judgeBias: () => api.get<JudgeBiasRow[]>("/calibration/judge-bias").then((r) => r.data),
+  faultLines: () => api.get<FaultLines>("/calibration/fault-lines").then((r) => r.data),
 };
 
 export const authApi = {

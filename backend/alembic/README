@@ -1,0 +1,34 @@
+Schema migrations.
+
+The database URL comes from DATABASE_URL in backend/.env, via
+alembic/env.py — never from alembic.ini, which has no URL in it. Switching
+between the local Postgres and Neon is that one variable, the same one the
+application reads.
+
+Run from backend/ with PYTHONPATH=. so `app` is importable.
+
+  Set up a database that has never been migrated
+      alembic upgrade head
+
+  After changing a model
+      alembic revision --autogenerate -m "what changed"
+      # read the generated file before applying it — autogenerate is good at
+      # added and dropped columns, and poor at renames, which it will
+      # cheerfully emit as a drop plus an add, losing the data in between
+      alembic upgrade head
+
+  Check whether the models and the database have drifted apart
+      alembic check
+
+  Undo the last migration
+      alembic downgrade -1
+
+The app no longer creates tables at startup. create_all only ever created
+MISSING TABLES — it silently ignored new columns on tables that already
+existed, which is how five columns came to be added by hand in psql with no
+record of it anywhere. A database that has not been migrated will now fail
+loudly on a missing table instead of quietly on a missing column.
+
+The baseline revision was generated against an empty scratch database so it
+contains the full CREATE, then both existing databases were stamped with it,
+since their schemas already matched. Nothing was recreated and no data moved.

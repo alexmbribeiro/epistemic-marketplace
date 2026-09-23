@@ -1,7 +1,8 @@
 import uuid
 from dataclasses import dataclass, field
 
-from app.services import claude_service
+from app.core.naming import resolve_agent
+from app.services import llm_service
 
 
 @dataclass
@@ -11,6 +12,7 @@ class AgentResult:
     archetype: str
     round_number: int
     belief_score: float
+    probability_true: float
     confidence_low: float
     confidence_high: float
     reasoning: str
@@ -30,9 +32,26 @@ class BaseAgent:
     description: str = ""
     system_prompt: str = ""
 
-    def __init__(self, agent_id: str | None = None, config: dict | None = None):
+    def __init__(
+        self,
+        agent_id: str | None = None,
+        config: dict | None = None,
+        system_prompt: str | None = None,
+        name: str | None = None,
+        archetype: str | None = None,
+    ):
         self.agent_id = agent_id or str(uuid.uuid4())
         self.config = config or {}
+        # The stored record wins over the class defaults. For the six seeded
+        # archetypes these are identical; for a user-authored agent the record
+        # is the only source of a persona, and without this it would debate
+        # with an empty system prompt.
+        if system_prompt:
+            self.system_prompt = system_prompt
+        if name:
+            self.name = name
+        if archetype:
+            self.archetype = archetype
 
     def _build_system_prompt(self) -> str:
         return self.system_prompt
@@ -44,10 +63,10 @@ CLAIM: "{claim}"
 
 Evaluate this claim independently. Do not assume consensus. Apply your cognitive architecture strictly."""
 
-        result = await claude_service.run_agent_turn(
+        result = await llm_service.run_agent_turn(
             self._build_system_prompt(),
             prompt,
-            claude_service.POSITION_SCHEMA,
+            llm_service.POSITION_SCHEMA,
         )
         return AgentResult(
             agent_id=self.agent_id,
@@ -58,21 +77,46 @@ Evaluate this claim independently. Do not assume consensus. Apply your cognitive
         )
 
     async def challenge(self, claim: str, others: list[AgentResult]) -> AgentResult:
-        others_summary = "\n".join(
-            f"- {r.agent_name} ({r.archetype}): belief={r.belief_score:.2f}, argument={r.argument_content}"
-            for r in others if r.agent_id != self.agent_id
+        def describe(r: AgentResult) -> str:
+            # Cruxes included on purpose: without them an agent can only argue
+            # against a headline, never against what would actually move the
+            # other's mind.
+            cruxes = "; ".join(r.cruxes[:2]) if r.cruxes else "none stated"
+            return (
+                f"- {r.agent_name} ({r.archetype}): P(true)={r.probability_true:.2f}, own verdict={r.belief_score:.2f}\n"
+                f"    argument: {r.argument_content}\n"
+                f"    would change their mind: {cruxes}"
+            )
+
+        others_summary = "\n".join(describe(r) for r in others if r.agent_id != self.agent_id)
+
+        # Every round is a fresh, stateless call — the agent remembers nothing
+        # it is not shown. Told to "form your updated position" without being
+        # shown the position, it re-derives from scratch and the number moves
+        # for no reason. Its own track is given explicitly, and kept apart from
+        # the others so it is not read as one more opinion in the room.
+        mine = next((r for r in others if r.agent_id == self.agent_id), None)
+        own_block = (
+            f"YOUR POSITION IN ROUND 1: P(true)={mine.probability_true:.2f}, "
+            f"own verdict={mine.belief_score:.2f}\n"
+            f"    {mine.argument_content}\n\n"
+            if mine
+            else ""
         )
         prompt = f"""CLAIM: "{claim}"
 
-Other agents have formed their initial positions:
+{own_block}Other agents have formed their initial positions:
 {others_summary}
 
-Now review these positions and form your updated position. Challenge positions you disagree with. Specify which agent you are challenging and why."""
+Now form your position for this round, starting from where you stood rather than from \
+scratch. Challenge positions you disagree with, naming the agent and saying why. Move if \
+what you have read gives you reason to; hold if it does not. Either is fine — say which \
+you did."""
 
-        result = await claude_service.run_agent_turn(
+        result = await llm_service.run_agent_turn(
             self._build_system_prompt(),
             prompt,
-            claude_service.CHALLENGE_SCHEMA,
+            llm_service.CHALLENGE_SCHEMA,
         )
         return AgentResult(
             agent_id=self.agent_id,
@@ -83,29 +127,78 @@ Now review these positions and form your updated position. Challenge positions y
             **{k: result[k] for k in result if k != "challenges"},
         )
 
+    def _challenges_against(self, round2: list[AgentResult]) -> list[tuple[str, dict]]:
+        """The challenges other agents aimed at this one.
+
+        Targets are written by the model in whatever form it likes, so they
+        have to be resolved rather than compared.
+        """
+        me = [{"label": self.name, "archetype": self.archetype}]
+        aimed = []
+        for r in round2:
+            if r.agent_id == self.agent_id:
+                continue
+            for ch in r.challenges or []:
+                if resolve_agent(ch.get("target_agent", ""), me) is not None:
+                    aimed.append((r.agent_name, ch))
+        return aimed
+
     async def synthesize(self, claim: str, round1: list[AgentResult], round2: list[AgentResult]) -> AgentResult:
         r1_summary = "\n".join(
-            f"- {r.agent_name}: belief={r.belief_score:.2f} | {r.argument_content}"
+            f"- {r.agent_name}: P(true)={r.probability_true:.2f} | {r.argument_content}"
             for r in round1
+            if r.agent_id != self.agent_id
         )
+
+        # Round three used to show the agent its own round 1 but not its own
+        # round 2 — the older half of its history and not the newer — so a
+        # position that had moved in round 2 was pulled straight back to where
+        # round 1 left it. Both are given now, as one track.
+        r1_mine = next((r for r in round1 if r.agent_id == self.agent_id), None)
+        r2_mine = next((r for r in round2 if r.agent_id == self.agent_id), None)
+        track = []
+        if r1_mine:
+            track.append(f"  round 1: P(true)={r1_mine.probability_true:.2f} — {r1_mine.argument_content}")
+        if r2_mine:
+            track.append(f"  round 2: P(true)={r2_mine.probability_true:.2f} — {r2_mine.argument_content}")
+        own_track = ("YOUR OWN TRACK SO FAR:\n" + "\n".join(track) + "\n\n") if track else ""
         r2_summary = "\n".join(
-            f"- {r.agent_name}: belief={r.belief_score:.2f} | {r.argument_content}"
+            f"- {r.agent_name}: P(true)={r.probability_true:.2f} | {r.argument_content}"
             for r in round2 if r.agent_id != self.agent_id
         )
+        # Challenges used to be produced, stored, drawn as arrows — and never
+        # delivered to the agent they were aimed at, which left every agent
+        # synthesising against headlines it had already seen.
+        aimed = self._challenges_against(round2)
+        if aimed:
+            addressed = "\n".join(
+                f"- {who} ({ch.get('type', 'contradicts')}): {ch.get('challenge', '')}"
+                for who, ch in aimed
+            )
+            challenge_block = (
+                f"\n\nCHALLENGES ADDRESSED TO YOU:\n{addressed}\n\n"
+                "Answer these directly. Say which land and which do not, and why. "
+                "Conceding a good challenge is not a loss; ignoring one is."
+            )
+        else:
+            challenge_block = "\n\nNobody challenged you directly this round."
+
         prompt = f"""CLAIM: "{claim}"
 
-ROUND 1 — Initial positions:
+{own_track}ROUND 1 — Initial positions of the others:
 {r1_summary}
 
-ROUND 2 — Cross-challenges:
-{r2_summary}
+ROUND 2 — Updated positions of the others:
+{r2_summary}{challenge_block}
 
-Now synthesize. Has your view changed? Why or why not? Provide your final position."""
+Now synthesize, starting from where your own track has been rather than from scratch. \
+State plainly whether your position moved across the three rounds, in which direction, \
+and what did or did not move it."""
 
-        result = await claude_service.run_agent_turn(
+        result = await llm_service.run_agent_turn(
             self._build_system_prompt(),
             prompt,
-            claude_service.SYNTHESIS_SCHEMA,
+            llm_service.SYNTHESIS_SCHEMA,
         )
         return AgentResult(
             agent_id=self.agent_id,

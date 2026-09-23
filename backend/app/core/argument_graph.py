@@ -1,6 +1,7 @@
 import uuid
 
 from app.agents.base_agent import AgentResult
+from app.core.naming import resolve_agent
 
 
 def build_argument_graph(all_rounds: list[list[AgentResult]]) -> dict:
@@ -30,7 +31,8 @@ def build_argument_graph(all_rounds: list[list[AgentResult]]) -> dict:
                     "id": node_id,
                     "label": f"{pos.agent_name} (R{pos.round_number})",
                     "archetype": pos.archetype,
-                    "belief_score": pos.belief_score,
+                    "belief_score": pos.probability_true,
+                    "own_verdict": pos.belief_score,
                     "argument_content": pos.argument_content,
                     "round": pos.round_number,
                     "type": "position",
@@ -64,11 +66,8 @@ def build_argument_graph(all_rounds: list[list[AgentResult]]) -> dict:
             if pos.round_number == 2 and pos.challenges:
                 for challenge in pos.challenges:
                     target_agent_name = challenge.get("target_agent", "")
-                    # Find the target agent's round 1 node
-                    target_node = next(
-                        (n for n in nodes if target_agent_name.lower() in n.get("label", "").lower() and "R1" in n.get("label", "")),
-                        None,
-                    )
+                    round1_nodes = [n for n in nodes if n.get("round") == 1]
+                    target_node = resolve_agent(target_agent_name, round1_nodes)
                     if target_node:
                         edges.append({
                             "id": str(uuid.uuid4()),

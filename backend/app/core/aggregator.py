@@ -3,30 +3,26 @@ import math
 from app.agents.base_agent import AgentResult
 
 
-def lmsr_weight(reputation: float) -> float:
-    """Convert reputation score to LMSR market weight."""
-    return math.log1p(reputation)
+def compute_belief_distribution(positions: list[AgentResult]) -> dict:
+    """Aggregate the agents' final beliefs.
 
-
-def compute_belief_distribution(positions: list[AgentResult], reputation_map: dict[str, float]) -> dict:
-    """
-    Aggregate agent beliefs using weighted average (LMSR-inspired).
-    reputation_map: {agent_id: reputation_score}
+    There used to be a reputation weighting here. It was never anything:
+    reputation_score was seeded at 1.0 and no code ever moved it, so every
+    weight was log1p(1.0) and the weighted mean equalled the plain mean in
+    every debate ever run. It is gone rather than left implying a weighting
+    that does not happen. Peer Elo deliberately does not replace it — see
+    core/jury.py on why the map of uncertainty is not weighted by how well
+    rival schools rate you.
     """
     if not positions:
-        return {"mean": 0.5, "std": 0.0, "weighted_mean": 0.5, "buckets": [], "dominant_agents": []}
+        return {"mean": 0.5, "std": 0.0, "buckets": [], "dominant_agents": []}
 
-    weights = []
-    beliefs = []
-    for pos in positions:
-        rep = reputation_map.get(pos.agent_id, 1.0)
-        w = lmsr_weight(rep)
-        weights.append(w)
-        beliefs.append(pos.belief_score)
-
-    total_weight = sum(weights)
-    weighted_mean = sum(b * w for b, w in zip(beliefs, weights)) / total_weight
-
+    # probability_true, not belief_score: each agent's own verdict measures
+    # something different by design — Dostoevsky scores whether a claim can be
+    # lived, Hume scores expectation from experience — so averaging those
+    # would add quantities that are not the same quantity. The common scale is
+    # the only one that can be summed.
+    beliefs = [pos.probability_true for pos in positions]
     mean = sum(beliefs) / len(beliefs)
     variance = sum((b - mean) ** 2 for b in beliefs) / len(beliefs)
     std = math.sqrt(variance)
@@ -39,20 +35,15 @@ def compute_belief_distribution(positions: list[AgentResult], reputation_map: di
         bucket_counts[idx] += 1
     buckets = [{"range": label, "count": count, "pct": count / len(beliefs)} for label, count in zip(bucket_labels, bucket_counts)]
 
-    # Find dominant agents (highest weighted belief contributors)
-    scored = sorted(
-        zip(positions, weights),
-        key=lambda x: abs(x[0].belief_score - 0.5) * x[1],
-        reverse=True,
-    )
-    dominant = [{"agent_name": p.agent_name, "belief_score": p.belief_score, "weight": w} for p, w in scored[:3]]
+    # The agents furthest from the fence — the ones actually driving the spread.
+    scored = sorted(positions, key=lambda p: abs(p.probability_true - 0.5), reverse=True)
+    dominant = [{"agent_name": p.agent_name, "belief_score": p.probability_true} for p in scored[:3]]
 
     # Identify zone of disagreement
     zone = _identify_disagreement_zone(positions)
 
     return {
         "mean": round(mean, 4),
-        "weighted_mean": round(weighted_mean, 4),
         "std": round(std, 4),
         "buckets": buckets,
         "dominant_agents": dominant,

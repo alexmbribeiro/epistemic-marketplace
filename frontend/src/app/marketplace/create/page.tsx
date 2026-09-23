@@ -31,55 +31,55 @@ export default function CreateAgentPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-slate-100">Create Cognitive Agent</h1>
-      <p className="text-slate-400 text-sm">
+      <h1 className="text-2xl font-bold text-white/90">Create Cognitive Agent</h1>
+      <p className="text-white/55 text-sm">
         Define a custom epistemic architecture. Your agent will participate in debates and earn reputation based on calibration.
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-5 rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+      <form onSubmit={handleSubmit} className="space-y-5 glass p-6">
         <div>
-          <label className="text-sm text-slate-400 block mb-1">Agent Name</label>
+          <label className="text-sm text-white/55 block mb-1">Agent Name</label>
           <input
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
+            className="w-full bg-white/[0.05] border border-white/12 rounded-2xl px-4 py-2.5 text-white/90 text-sm focus:outline-none focus:border-white/25"
             placeholder="e.g. Skeptical Pragmatist"
             required
           />
         </div>
 
         <div>
-          <label className="text-sm text-slate-400 block mb-1">Description</label>
+          <label className="text-sm text-white/55 block mb-1">Description</label>
           <input
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
+            className="w-full bg-white/[0.05] border border-white/12 rounded-2xl px-4 py-2.5 text-white/90 text-sm focus:outline-none focus:border-white/25"
             placeholder="How does this agent reason?"
             required
           />
         </div>
 
         <div>
-          <label className="text-sm text-slate-400 block mb-1">
+          <label className="text-sm text-white/55 block mb-1">
             System Prompt{" "}
-            <span className="text-slate-600 text-xs">(defines the cognitive architecture)</span>
+            <span className="text-white/28 text-xs">(defines the cognitive architecture)</span>
           </label>
           <textarea
             value={form.system_prompt}
             onChange={(e) => setForm((f) => ({ ...f, system_prompt: e.target.value }))}
             rows={8}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 text-sm resize-none focus:outline-none focus:border-indigo-500 font-mono"
+            className="w-full bg-white/[0.05] border border-white/12 rounded-2xl px-4 py-3 text-white/90 text-sm resize-none focus:outline-none focus:border-white/25 font-mono"
             placeholder="You are an epistemic agent that reasons by... Your output must always include a belief_score between 0 and 1..."
             required
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+        <label className="flex items-center gap-2 text-sm text-white/55 cursor-pointer">
           <input
             type="checkbox"
             checked={form.is_public}
             onChange={(e) => setForm((f) => ({ ...f, is_public: e.target.checked }))}
-            className="rounded border-slate-600 bg-slate-800"
+            className="rounded border-white/20 bg-white/[0.07]"
           />
           Make this agent public
         </label>
@@ -89,7 +89,7 @@ export default function CreateAgentPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3 rounded-lg transition-colors text-sm"
+          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-white/10 disabled:text-white/40 text-white font-semibold py-3 rounded-lg transition-colors text-sm"
         >
           {loading ? "Creating..." : "Deploy Agent →"}
         </button>
