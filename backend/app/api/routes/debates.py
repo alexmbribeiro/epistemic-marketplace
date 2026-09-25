@@ -85,10 +85,13 @@ async def create_debate(
     jury_records = select_jury([a for a in all_agents], list(participant_ids), JURY_SIZE)
 
     agent_ids = [rec.id for rec in agent_db_records]
+    # Settings decide, not the caller: a request cannot ask to be ranked.
+    ranked = settings.allow_ranked_debates
     debate = Debate(
         claim_id=claim.id,
         status="initializing",
         agent_ids=agent_ids,
+        ranked=ranked,
     )
     db.add(debate)
     await db.commit()
@@ -108,14 +111,21 @@ async def create_debate(
 
     # Run debate in background
     asyncio.create_task(
-        _run_debate_background(str(debate.id), str(claim.id), claim.content, agent_db_records, jury_records)
+        _run_debate_background(
+            str(debate.id), str(claim.id), claim.content, agent_db_records, jury_records, ranked=ranked
+        )
     )
 
     return debate
 
 
 async def _run_debate_background(
-    debate_id: str, claim_id: str, claim_content: str, agent_records: list, jury_records: list | None = None
+    debate_id: str,
+    claim_id: str,
+    claim_content: str,
+    agent_records: list,
+    jury_records: list | None = None,
+    ranked: bool = False,
 ):
     async with AsyncSessionLocal() as db:
         try:
@@ -164,7 +174,7 @@ async def _run_debate_background(
                         cruxes=pos["cruxes"],
                     ))
 
-            await _record_jury(db, debate_id, result, agent_records, jury_records or [])
+            await _record_jury(db, debate_id, result, agent_records, jury_records or [], ranked=ranked)
 
             # Update claim status
             claim_result = await db.execute(select(Claim).where(Claim.id == uuid.UUID(claim_id)))
@@ -183,8 +193,15 @@ async def _run_debate_background(
                 await db.commit()
 
 
-async def _record_jury(db, debate_id: str, result: dict, agent_records: list, jury_records: list) -> None:
-    """Persist each judge's scores, then move the Elo of everyone who debated."""
+async def _record_jury(
+    db, debate_id: str, result: dict, agent_records: list, jury_records: list, ranked: bool = True
+) -> None:
+    """Persist each judge's scores, then move the Elo of everyone who debated.
+
+    The scores are stored either way — an exhibition debate is fully judged
+    and fully readable. Only a ranked one moves the Elo, because an open site
+    would otherwise let whoever runs the most debates reshape the ranking.
+    """
     verdict = (result.get("synthesis") or {}).get("jury") or {}
     rows = verdict.get("rows") or []
     if not rows:
@@ -210,6 +227,9 @@ async def _record_jury(db, debate_id: str, result: dict, agent_records: list, ju
             overall=sum(crit) / len(crit),
             comment=r.get("comment", ""),
         ))
+
+    if not ranked:
+        return
 
     scores = verdict.get("scores") or {}
     mean_scores = {name: data["overall"] for name, data in scores.items() if name in by_name}
@@ -280,7 +300,7 @@ async def rejudge(debate_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 
     # JSONB does not notice in-place mutation; reassign so it is written.
     debate.synthesis = {**debate.synthesis, "jury": verdict}
-    await _record_jury(db, str(debate_id), {"synthesis": debate.synthesis}, agent_records, jury_records)
+    await _record_jury(db, str(debate_id), {"synthesis": debate.synthesis}, agent_records, jury_records, ranked=debate.ranked)
     await db.commit()
 
     return {

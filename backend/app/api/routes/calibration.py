@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.agent import CognitiveAgent
-from app.models.debate import AgentPosition, JuryRating
+from app.models.debate import AgentPosition, Debate, JuryRating
 
 router = APIRouter(prefix="/calibration", tags=["calibration"])
 
@@ -25,7 +25,10 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
                 func.avg(JuryRating.crux_quality),
                 func.avg(JuryRating.responsiveness),
                 func.count(JuryRating.id),
-            ).group_by(JuryRating.subject_agent_id)
+            )
+            .join(Debate, Debate.id == JuryRating.debate_id)
+            .where(Debate.ranked)
+            .group_by(JuryRating.subject_agent_id)
         )
     ).all()
     by_agent = {
@@ -72,7 +75,10 @@ async def judge_bias(db: AsyncSession = Depends(get_db)):
                 JuryRating.subject_agent_id,
                 func.avg(JuryRating.overall),
                 func.count(JuryRating.id),
-            ).group_by(JuryRating.judge_agent_id, JuryRating.subject_agent_id)
+            )
+            .join(Debate, Debate.id == JuryRating.debate_id)
+            .where(Debate.ranked)
+            .group_by(JuryRating.judge_agent_id, JuryRating.subject_agent_id)
         )
     ).all()
     names = {
@@ -99,8 +105,9 @@ async def fault_lines(db: AsyncSession = Depends(get_db)):
     """
     finals = (
         await db.execute(
-            select(AgentPosition.debate_id, AgentPosition.agent_id, AgentPosition.belief_score)
-            .where(AgentPosition.round_number == 3)
+            select(AgentPosition.debate_id, AgentPosition.agent_id, AgentPosition.probability_true)
+            .join(Debate, Debate.id == AgentPosition.debate_id)
+            .where(AgentPosition.round_number == 3, Debate.ranked)
         )
     ).all()
     names = {a.id: a.name for a in (await db.execute(select(CognitiveAgent))).scalars().all()}

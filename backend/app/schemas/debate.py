@@ -15,6 +15,7 @@ class DebateCreate(BaseModel):
 class DebateResponse(BaseModel):
     id: uuid.UUID
     claim_id: uuid.UUID
+    ranked: bool = False
     claim_content: str | None = None
     claim_category: str | None = None
     status: str

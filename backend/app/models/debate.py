@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,6 +14,12 @@ class Debate(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     claim_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("claims.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="initializing")
+    # Whether this debate counts toward the Elo and the per-agent statistics.
+    # A public visitor gets the whole experience — the rounds, the jury, the
+    # scores, all stored — but an open site would otherwise let anyone reshape
+    # the ranking by running twenty debates with their favourite, and the
+    # corpus is only meaningful because participation is balanced.
+    ranked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     agent_ids: Mapped[list] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
     final_belief_distribution: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     argument_graph: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

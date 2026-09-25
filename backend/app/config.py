@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     agent_max_concurrency: int = 3
     agent_timeout_seconds: float = 120.0
 
+    # Off by default so a public deployment cannot have its ranking reshaped
+    # by whoever runs the most debates. Turn it on locally to build the corpus.
+    allow_ranked_debates: bool = False
+
     # Comma-separated. The deployed frontend origin must be listed here.
     # Both loopback spellings: they are distinct origins to the browser, and
     # opening the app on 127.0.0.1 otherwise loads fine but fetches nothing.

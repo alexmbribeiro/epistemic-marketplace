@@ -75,8 +75,9 @@ async def agent_stats(agent_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     # Final-round belief per agent per debate.
     finals = (
         await db.execute(
-            select(AgentPosition.debate_id, AgentPosition.agent_id, AgentPosition.belief_score)
-            .where(AgentPosition.round_number == 3)
+            select(AgentPosition.debate_id, AgentPosition.agent_id, AgentPosition.probability_true)
+            .join(Debate, Debate.id == AgentPosition.debate_id)
+            .where(AgentPosition.round_number == 3, Debate.ranked)
         )
     ).all()
 
@@ -112,14 +113,16 @@ async def agent_stats(agent_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     given = (
         await db.execute(
             select(JuryRating.subject_agent_id, func.avg(JuryRating.overall), func.count(JuryRating.id))
-            .where(JuryRating.judge_agent_id == agent_id)
+            .join(Debate, Debate.id == JuryRating.debate_id)
+            .where(JuryRating.judge_agent_id == agent_id, Debate.ranked)
             .group_by(JuryRating.subject_agent_id)
         )
     ).all()
     received = (
         await db.execute(
             select(JuryRating.judge_agent_id, func.avg(JuryRating.overall), func.count(JuryRating.id))
-            .where(JuryRating.subject_agent_id == agent_id)
+            .join(Debate, Debate.id == JuryRating.debate_id)
+            .where(JuryRating.subject_agent_id == agent_id, Debate.ranked)
             .group_by(JuryRating.judge_agent_id)
         )
     ).all()
@@ -135,15 +138,18 @@ async def agent_stats(agent_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
                 func.avg(JuryRating.crux_quality),
                 func.avg(JuryRating.responsiveness),
                 func.count(JuryRating.id),
-            ).where(JuryRating.subject_agent_id == agent_id)
+            )
+            .join(Debate, Debate.id == JuryRating.debate_id)
+            .where(JuryRating.subject_agent_id == agent_id, Debate.ranked)
         )
     ).first()
 
     # Swing: total distance travelled across rounds, averaged over debates.
     all_positions = (
         await db.execute(
-            select(AgentPosition.debate_id, AgentPosition.round_number, AgentPosition.belief_score)
-            .where(AgentPosition.agent_id == agent_id)
+            select(AgentPosition.debate_id, AgentPosition.round_number, AgentPosition.probability_true)
+            .join(Debate, Debate.id == AgentPosition.debate_id)
+            .where(AgentPosition.agent_id == agent_id, Debate.ranked)
             .order_by(AgentPosition.debate_id, AgentPosition.round_number)
         )
     ).all()
@@ -179,7 +185,7 @@ async def agent_stats(agent_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
             select(Claim.category, func.avg(JuryRating.overall), func.count(JuryRating.id))
             .join(Debate, Debate.claim_id == Claim.id)
             .join(JuryRating, JuryRating.debate_id == Debate.id)
-            .where(JuryRating.subject_agent_id == agent_id)
+            .where(JuryRating.subject_agent_id == agent_id, Debate.ranked)
             .group_by(Claim.category)
         )
     ).all()
@@ -202,6 +208,8 @@ async def agent_stats(agent_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     per_debate_crux = (
         await db.execute(
             select(JuryRating.debate_id, JuryRating.subject_agent_id, func.avg(JuryRating.crux_quality))
+            .join(Debate, Debate.id == JuryRating.debate_id)
+            .where(Debate.ranked)
             .group_by(JuryRating.debate_id, JuryRating.subject_agent_id)
         )
     ).all()
